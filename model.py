@@ -6,6 +6,10 @@ from config import log_process, LOGGER
 from utils import CHESTMNIST_CLASS_NAMES
 import logging
 
+# ============================================================
+# GRAPH ARCHITECTURE COMPONENTS
+# ============================================================
+
 class GraphGPSLayer(nn.Module):
     """
     Parallel residual: Local GCN branch + Global Transformer branch.
@@ -55,6 +59,10 @@ class LabelGraphGPSClassifier(nn.Module):
             h = layer(h, adj)
         return self.out_proj(self.norm_out(h))
 
+# ============================================================
+# CLUSTERING & REPRESENTATION LEARNING
+# ============================================================
+
 class StudentTClustering(nn.Module):
     """Soft cluster assignments via heavy-tailed Student-t kernel (Xie et al., ICML 2016)."""
     def __init__(self, num_clusters=20, feat_dim=384, v=4.0):
@@ -83,7 +91,14 @@ def target_distribution(q):
     p = q**2 / q.sum(0, keepdim=True).clamp(1e-12)
     return p / p.sum(1, keepdim=True).clamp(1e-12)
 
+# ============================================================
+# POOLING & MAIN MODEL
+# ============================================================
+
 class GLoRI_Lite_Pooler(nn.Module):
+    """
+    f = gate ⊙ CLS_proxy + (1−gate) ⊙ GeM(patches)
+    """
     def __init__(self, feat_dim=384, gem_p_init=3.0, dropout=0.1):
         super().__init__()
         self.gem_p = nn.Parameter(torch.tensor(gem_p_init))
@@ -97,12 +112,18 @@ class GLoRI_Lite_Pooler(nn.Module):
         self.norm = nn.LayerNorm(feat_dim)
 
     def forward(self, cls_token, patches):
+        # NATURE-GRADE FIX 2: 
+        # p-ს შეზღუდვა [1, 10] დიაპაზონში და clamp(min=1e-6) abs()-ის ნაცვლად
+        # ეს უზრუნველყოფს გლუვ გრადიენტებს და თავიდან აცილებს რიცხვით გადავსებას (overflow).
         p = self.gem_p.clamp(min=1.0, max=10.0)
         gem = patches.clamp(min=1e-6).pow(p).mean(1).pow(1.0 / p)
         g = self.gate_mlp(torch.cat([cls_token, gem], -1))
         return self.norm(g * cls_token + (1 - g) * gem)
 
 class CXR_Synapse_Foundation(nn.Module):
+    """
+    CXR-Synapse with Google ELIXR-C v2 as frozen external backbone.
+    """
     def __init__(self, num_classes=14, cxr_dim=1376, feat_dim=384, gat_embed=128, gat_hidden=128, gat_heads=4, dropout=0.1):
         super().__init__()
         self.feat_dim = feat_dim
@@ -120,6 +141,8 @@ class CXR_Synapse_Foundation(nn.Module):
         self.student_t_clustering = StudentTClustering(20, feat_dim, v=4.0)
         self.label_graph = LabelGraphGPSClassifier(num_classes, gat_embed, gat_hidden, feat_dim, 768, gat_heads, 2, dropout)
         self.feat_dropout = nn.Dropout(dropout)
+        
+        # Buffers for non-trainable graph parameters
         self.register_buffer("adj_mask", torch.eye(num_classes))
         self.register_buffer("radlex_emb", torch.zeros(num_classes, 768))
 
@@ -136,18 +159,27 @@ class CXR_Synapse_Foundation(nn.Module):
     def forward(self, x: torch.Tensor):
         assert self.radlex_emb.abs().sum() > 0, "RadLex embeddings are zero — call set_radlex_embeddings() first."
         B, H, W, C = x.shape
-        patches = x.view(B, H * W, C)
-        proj = self.dim_reduction(patches)
-        cls = proj.mean(dim=1)
-        fused = self.pooler(cls, proj)
-        q = self.student_t_clustering(fused)
-        W_class = self.label_graph(self.radlex_emb, self.adj_mask)
-        logits = torch.matmul(self.feat_dropout(fused), W_class.t())
+        patches = x.view(B, H * W, C)            # [B, 64, 1376]
+        proj = self.dim_reduction(patches)        # [B, 64, 384]
+        cls = proj.mean(dim=1)                    # CLS proxy
+        fused = self.pooler(cls, proj)            # [B, 384]
+        q = self.student_t_clustering(fused)      # Clustering assignment
+        W_class = self.label_graph(self.radlex_emb, self.adj_mask) # [14, 384]
+        
+        logits = torch.matmul(self.feat_dropout(fused), W_class.t()) # [B, 14]
+        
         if self.training:
             return logits, fused, q
         return logits
 
+# ============================================================
+# LOSS FUNCTIONS & EVIDENTIAL UNCERTAINTY
+# ============================================================
+
 class LogitAdjustedAsymmetricEvidentialLoss(nn.Module):
+    """
+    Unified loss: Logit Adjustment + Asymmetric Loss + Evidential penalty.
+    """
     def __init__(self, logit_adj, gamma_pos=0.0, gamma_neg=4.0, clip=0.05, annealing_epochs=15):
         super().__init__()
         self.register_buffer("logit_adj", logit_adj)
@@ -157,23 +189,31 @@ class LogitAdjustedAsymmetricEvidentialLoss(nn.Module):
         self.annealing_epochs = max(int(annealing_epochs), 1)
 
     def forward(self, logits, targets, current_epoch):
+        # 1. Logit Adjustment (Prior shift)
         adjusted_logits = logits + self.logit_adj
+        
+        # 2. Asymmetric Focal Loss
         prob = torch.sigmoid(adjusted_logits)
         prob_pos = prob
         prob_neg = 1.0 - prob
         if self.clip > 0:
             prob_neg = (prob_neg + self.clip).clamp(max=1.0)
+            
         loss_pos = targets * (-torch.log(prob_pos.clamp(min=1e-8))) * torch.pow(1.0 - prob_pos, self.gamma_pos)
         loss_neg = (1.0 - targets) * (-torch.log(prob_neg.clamp(min=1e-8))) * torch.pow(1.0 - prob_neg, self.gamma_neg)
         clf_loss = (loss_pos + loss_neg).mean()
+        
+        # 3. Evidential Regularization
         evidence_pos = F.softplus(adjusted_logits)
         evidence_neg = F.softplus(-adjusted_logits)
         penalty = targets * evidence_neg + (1.0 - targets) * evidence_pos
         anneal_coef = min(1.0, float(current_epoch) / float(self.annealing_epochs))
         edl_loss = torch.mean(penalty) * anneal_coef
+        
         return clf_loss + 0.1 * edl_loss
 
 def get_evidential_metrics(logits):
+    """Decomposition of uncertainty into Epistemic and Aleatoric components."""
     ep = F.softplus(logits)
     en = F.softplus(-logits)
     alpha = ep + 1.0

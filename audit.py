@@ -1,5 +1,6 @@
 import hashlib
 import warnings
+import gc # Add garbage collection
 from typing import Dict, List, Tuple, Optional, Set
 
 import torch
@@ -37,24 +38,39 @@ class ForensicDatasetAuditor:
     ]
 
     def __init__(self, dataset, split_name: str = "Train", n_bins_mi: int = 50):
-        self.dataset = dataset
+        self.dataset = dataset # Keep original dataset reference
         self.split_name = split_name
         self.n_bins_mi = n_bins_mi
 
-        self.images = dataset.imgs.astype(np.float32) / 255.0
         self.labels = dataset.labels.astype(np.int32)
         self.class_names = [dataset.info['label'][str(i)] for i in range(len(dataset.info['label']))]
-        self.n_samples = len(self.images)
-        self.n_classes = len(self.class_names)
+        self.n_samples = len(self.labels) # Use labels length for consistency
 
-        if self.images.ndim == 4:
-            self.images = self.images.squeeze(-1)
-        self.h, self.w = self.images.shape[1], self.images.shape[2]
+        # Get image dimensions from the first image without loading all to float32
+        if self.n_samples > 0:
+            first_image = dataset.imgs[0]
+            if first_image.ndim == 3: # Handle (H, W, C) or (H, W, 1)
+                self.h, self.w = first_image.shape[0], first_image.shape[1]
+            else: # (H, W)
+                self.h, self.w = first_image.shape[0], first_image.shape[1]
+        else:
+            self.h, self.w = 0, 0 # Default for empty dataset
+
+        self.n_classes = len(self.class_names)
         self.results = {}
 
+    def _get_images_as_float32(self, indices=None):
+        """Lazily load and convert images to float32, or a subset if indices are provided."""
+        if indices is not None:
+            return self.dataset.imgs[indices].astype(np.float32) / 255.0
+        return self.dataset.imgs.astype(np.float32) / 255.0
+
     def audit_information_theory(self):
-        img_means = np.mean(self.images, axis=(1, 2))
-        img_stds  = np.std(self.images, axis=(1, 2))
+        # Temporarily load all images to perform calculations
+        images_float32 = self._get_images_as_float32()
+        
+        img_means = np.mean(images_float32, axis=(1, 2))
+        img_stds  = np.std(images_float32, axis=(1, 2))
 
         n_bins = min(self.n_bins_mi, max(10, int(np.sqrt(self.n_samples / 5))))
         bins_mean = np.histogram_bin_edges(img_means, bins=n_bins)
@@ -81,23 +97,33 @@ class ForensicDatasetAuditor:
             'mi_mean': mi_mean_scores, 'mi_std': mi_std_scores, 'mi_joint': mi_joint_scores,
             'nmi': nmi_scores, 'joint_entropy': j_entropy, 'q_means': q_means, 'q_stds': q_stds,
         })
+        del images_float32 # Free memory
+        gc.collect()
+
 
     def audit_spatial_morphology(self):
-        global_mean = np.mean(self.images, axis=0)
-        std_heatmap = np.std(self.images, axis=0)
+        # Temporarily load all images for global stats
+        images_float32 = self._get_images_as_float32()
+        
+        global_mean = np.mean(images_float32, axis=0)
+        std_heatmap = np.std(images_float32, axis=0)
 
         diff_maps = {}
         for i, name in enumerate(self.class_names):
             mask = self.labels[:, i] == 1
             if mask.sum() >= 10:  
-                class_mean = np.mean(self.images[mask], axis=0)
+                class_mean = np.mean(images_float32[mask], axis=0)
                 diff_maps[name] = class_mean - global_mean
 
         rng = np.random.RandomState(GLOBAL_SEED)
         sample_idx = rng.choice(self.n_samples, min(1000, self.n_samples), replace=False)
-        edge_density = np.mean([filters.sobel(self.images[i]) for i in sample_idx], axis=0)
+        # Only load a subset for edge density calculation
+        sampled_images = self._get_images_as_float32(sample_idx)
+        edge_density = np.mean([filters.sobel(img) for img in sampled_images], axis=0)
 
         self.results.update({'global_mean': global_mean, 'std_heatmap': std_heatmap, 'diff_maps': diff_maps, 'edge_density': edge_density})
+        del images_float32, sampled_images # Free memory
+        gc.collect()
 
     def audit_clinical_logic(self):
         n = self.n_classes
@@ -126,9 +152,12 @@ class ForensicDatasetAuditor:
         })
 
     def audit_safety_integrity(self):
-        image_entropies = np.array([entropy(np.histogram(self.images[i], bins=30, density=True)[0] + 1e-10) for i in range(self.n_samples)])
-        img_means = np.mean(self.images, axis=(1, 2))
-        img_stds  = np.std(self.images, axis=(1, 2))
+        # Temporarily load all images for entropy, SNR, and hashing
+        images_float32 = self._get_images_as_float32()
+
+        image_entropies = np.array([entropy(np.histogram(images_float32[i], bins=30, density=True)[0] + 1e-10) for i in range(self.n_samples)])
+        img_means = np.mean(images_float32, axis=(1, 2))
+        img_stds  = np.std(images_float32, axis=(1, 2))
         snrs = img_means / (img_stds + 1e-8)
 
         low_snr_mask = snrs < np.percentile(snrs, 1)
@@ -137,7 +166,8 @@ class ForensicDatasetAuditor:
         hashes = set()
         dup_indices = []
         for i in range(self.n_samples):
-            h = hashlib.blake2b(self.images[i].tobytes(), digest_size=16).hexdigest()
+            # Hash directly from original uint8 data to save memory/speed
+            h = hashlib.blake2b(self.dataset.imgs[i].tobytes(), digest_size=16).hexdigest()
             if h in hashes:
                 dup_indices.append(i)
             hashes.add(h)
@@ -146,10 +176,14 @@ class ForensicDatasetAuditor:
             'img_entropy': image_entropies, 'snr_dist': snrs, 'low_snr_count': low_snr_count,
             'duplicates': len(dup_indices), 'dup_indices': dup_indices, 'n_unique_hash': len(hashes),
         })
+        del images_float32 # Free memory
+        gc.collect()
+
 
     @staticmethod
     def compute_image_hashes(dataset, digest_size: int = 16) -> Set[str]:
-        imgs = dataset.imgs.astype(np.float32)
+        # Use uint8 for hashing to avoid float32 conversion memory overhead
+        imgs = dataset.imgs
         hashes = set()
         for i in range(len(imgs)):
             h = hashlib.blake2b(imgs[i].tobytes(), digest_size=digest_size).hexdigest()
@@ -169,12 +203,19 @@ class ForensicDatasetAuditor:
                 print(f"     [!] LEAKAGE: {len(overlap)} images shared with {name}!")
             else:
                 print(f"     [✓] CLEAN: 0 images shared with {name}.")
+            del other_hashes # Free memory
+            gc.collect()
 
         self.results['cross_split_leakage'] = leakage_report
+        del self_hashes # Free memory
+        gc.collect()
         return leakage_report
 
     def audit_localized_structure(self, grid_size: int = 2):
         print(f"\n[*] Localized Spatial Audit ({grid_size}x{grid_size} grid)...")
+        # Temporarily load all images
+        images_float32 = self._get_images_as_float32()
+
         ph, pw = self.h // grid_size, self.w // grid_size
         quadrant_info = {}
 
@@ -182,7 +223,7 @@ class ForensicDatasetAuditor:
             for j in range(grid_size):
                 y0, y1 = i * ph, (i + 1) * ph
                 x0, x1 = j * pw, (j + 1) * pw
-                patches = self.images[:, y0:y1, x0:x1]
+                patches = images_float32[:, y0:y1, x0:x1]
                 patch_means = np.mean(patches, axis=(1, 2))
                 patch_std  = np.std(patches, axis=(1, 2))
                 patch_feat = np.round(patch_means * 50).astype(int) * 100 + np.round(patch_std * 50).astype(int)
@@ -192,6 +233,8 @@ class ForensicDatasetAuditor:
                 }
 
         self.results['spatial_quadrants'] = quadrant_info
+        del images_float32 # Free memory
+        gc.collect()
         return quadrant_info
 
     def audit_clinical_consistency(self):
@@ -234,7 +277,8 @@ class ForensicDatasetAuditor:
         return ens_df
 
     def audit_entropy_gap(self):
-        if 'img_entropy' not in self.results: self.audit_safety_integrity()
+        if 'img_entropy' not in self.results: 
+            self.audit_safety_integrity() # Call this to ensure img_entropy is computed
         ent = self.results['img_entropy']
         has_disease = self.labels.sum(axis=1) > 0
         ent_pos, ent_neg = ent[has_disease], ent[~has_disease]
@@ -291,7 +335,16 @@ class ForensicDatasetAuditor:
             sns.heatmap(self.results['cond_prev'], ax=ax['A'], annot=True, fmt='.2f', cmap='mako', xticklabels=short_names, yticklabels=short_names, linewidths=0.5, linecolor='white')
             ax['A'].set_title("A. Conditional Prevalence P(Row | Col)", fontweight='bold')
             
-            im_b = ax['B'].imshow(self.results['std_heatmap'], cmap='magma', aspect='equal')
+            # Use a sample of images for pixel-wise variance if dataset is very large
+            if self.n_samples > 5000: # Heuristic to avoid OOM for very large datasets
+                sample_indices = np.random.choice(self.n_samples, 5000, replace=False)
+                sampled_images_float32 = self._get_images_as_float32(sample_indices)
+                im_b = ax['B'].imshow(np.std(sampled_images_float32, axis=0), cmap='magma', aspect='equal')
+                del sampled_images_float32
+            else:
+                images_float32 = self._get_images_as_float32()
+                im_b = ax['B'].imshow(np.std(images_float32, axis=0), cmap='magma', aspect='equal')
+                del images_float32
             ax['B'].set_title("B. Pixel-Wise Variance", fontweight='bold'); ax['B'].axis('off')
             plt.colorbar(im_b, ax=ax['B'], fraction=0.046)
 
@@ -306,17 +359,29 @@ class ForensicDatasetAuditor:
             ax['E'].barh([short_names[i] for i in sorted_idx], [self.results['mi_joint'][i] for i in sorted_idx], color='#D55E00', alpha=0.85)
             ax['E'].set_title("E. Mutual Info", fontweight='bold'); ax['E'].invert_yaxis()
 
-            ax['F'].imshow(self.results['global_mean'], cmap='bone', aspect='equal')
+            # Global mean image requires all images
+            images_float32_for_global = self._get_images_as_float32()
+            ax['F'].imshow(np.mean(images_float32_for_global, axis=0), cmap='bone', aspect='equal')
             ax['F'].set_title("F. Global Mean Image", fontweight='bold'); ax['F'].axis('off')
-
+            
+            # Edge density is already sampled in audit_spatial_morphology
             ax['G'].imshow(self.results['edge_density'], cmap='viridis', aspect='equal')
             ax['G'].set_title("G. Edge Density", fontweight='bold'); ax['G'].axis('off')
 
+            # Class Intensity Profiles - sample if needed
+            images_float32_for_h = self._get_images_as_float32()
             for i in range(min(5, self.n_classes)):
                 mask_c = self.labels[:, i] == 1
                 if mask_c.sum() > 0:
-                    sns.kdeplot(self.images[mask_c].flatten()[:10000], ax=ax['H'], label=short_names[i], linewidth=0.8)
+                    # Sample up to 10000 pixels if class is very large
+                    flattened_pixels = images_float32_for_h[mask_c].flatten()
+                    if len(flattened_pixels) > 10000:
+                        flattened_pixels = np.random.choice(flattened_pixels, 10000, replace=False)
+                    sns.kdeplot(flattened_pixels, ax=ax['H'], label=short_names[i], linewidth=0.8)
             ax['H'].set_title("H. Class Intensity Profiles", fontweight='bold'); ax['H'].legend(fontsize=6, ncol=2)
+            del images_float32_for_global, images_float32_for_h # Free memory
+            gc.collect()
+
 
             sns.histplot(self.results['cardinality'], ax=ax['I'], discrete=True, color='#009E73')
             ax['I'].set_title(f"I. Label Cardinality", fontweight='bold')
@@ -340,25 +405,41 @@ class ForensicDatasetAuditor:
             plt.close(fig)
         except Exception as e:
             print(f"\n[!] Could not generate plots: {e}")
+        finally:
+            # Ensure figures are closed and memory is freed even if plotting fails
+            plt.close('all')
+            gc.collect()
 
 # ============================================================
 # EXECUTION WRAPPER
 # ============================================================
 def execute_forensic_audit(train_dataset, val_dataset, test_dataset):
     print("\n" + "=" * 65)
-    print("  EXECUTING FORENSIC DATASET AUDIT")
+    print("  EXECUTING FORENSIC DATASET AUDIT (Memory-Optimized)")
     print("=" * 65)
 
-    auditor_train = ForensicDatasetAuditor(train_dataset, split_name="Train")
-    auditor_val   = ForensicDatasetAuditor(val_dataset,   split_name="Val")
-    auditor_test  = ForensicDatasetAuditor(test_dataset,  split_name="Test")
-
-    leakage = auditor_train.audit_cross_split_leakage({'Val': val_dataset, 'Test': test_dataset})
-    leakage_vt = auditor_val.audit_cross_split_leakage({'Test': test_dataset})
+    # Perform leakage audit first, as it needs all datasets
+    auditor_for_leakage = ForensicDatasetAuditor(train_dataset, split_name="Train")
+    leakage = auditor_for_leakage.audit_cross_split_leakage({'Val': val_dataset, 'Test': test_dataset})
+    
+    # Audit leakage between Val and Test too
+    auditor_val_leakage = ForensicDatasetAuditor(val_dataset, split_name="Val")
+    leakage_vt = auditor_val_leakage.audit_cross_split_leakage({'Test': test_dataset})
 
     total_leakage = sum(leakage.values()) + sum(leakage_vt.values())
     print(f"\n  {'='*50}")
     print(f"  LEAKAGE VERDICT: {'[✓] CLEAN' if total_leakage == 0 else f'[!] CONTAMINATED ({total_leakage} overlap)'}")
     print(f"  {'='*50}")
 
-    auditor_train.generate_report()
+    del auditor_for_leakage, auditor_val_leakage # Free memory after leakage check
+    gc.collect()
+
+    # Now, run full audits sequentially, one dataset at a time
+    print("\n[*] Generating full audit reports per split (sequentially to manage memory)...")
+    for ds, name in zip([train_dataset, val_dataset, test_dataset], ["Train", "Val", "Test"]):
+        print(f"\n--- Starting detailed audit for {name} split ---")
+        auditor = ForensicDatasetAuditor(ds, split_name=name)
+        auditor.generate_report()
+        del auditor # Delete the auditor object
+        gc.collect() # Force garbage collection
+        print(f"--- Finished detailed audit for {name} split ---\n")

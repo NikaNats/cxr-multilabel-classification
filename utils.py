@@ -1,12 +1,23 @@
 import os
+import math
+import time
+import logging
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from sklearn.metrics import f1_score, brier_score_loss, roc_auc_score, average_precision_score
-from config import log_process, LOGGER
 from scipy.ndimage import uniform_filter1d
-import logging
+from sklearn.metrics import (
+    f1_score, 
+    roc_auc_score, 
+    average_precision_score, 
+    brier_score_loss
+)
+from config import log_process, LOGGER
+
+# ============================================================
+# PATHOLOGY & CLASS DEFINITIONS
+# ============================================================
 
 CHESTMNIST_CLASS_NAMES = [
     "Atelectasis", "Cardiomegaly", "Effusion", "Infiltration", "Mass", 
@@ -33,7 +44,12 @@ def configure_nature_plots():
     })
     print("✓ Plotting style configured to Nature standards.")
 
+# ============================================================
+# SOTA BIOMEDICAL TEXT EMBEDDINGS
+# ============================================================
+
 def ensure_radlex_embeddings(path, pathologies, model_name, device_):
+    """Generates or loads SOTA BioViL-T text embeddings for pathologies."""
     from transformers import AutoModel, AutoTokenizer
     target_dim = 768 
     if os.path.exists(path):
@@ -67,7 +83,15 @@ def ensure_radlex_embeddings(path, pathologies, model_name, device_):
     torch.save(final_res, path)
     return final_res.to(device_)
 
+# ============================================================
+# DYNAMIC GRAPH ADJACENCY (NATURE FIX 1)
+# ============================================================
+
 def select_adjacency_threshold(labels: np.ndarray, num_classes: int = 14, threshold_bounds: tuple = (0.05, 0.40)) -> float:
+    """
+    Selects the optimal threshold via Elbow Method (max |d²density/dt²|).
+    Clamped to guard against noise-dominated curvature on small subsets.
+    """
     co = np.zeros((num_classes, num_classes), dtype=np.float64)
     for row in labels:
         idx = np.where(row == 1)[0]
@@ -81,21 +105,27 @@ def select_adjacency_threshold(labels: np.ndarray, num_classes: int = 14, thresh
     thresholds = np.linspace(0.01, 0.95, 200)
     densities = [(prob >= t).mean() for t in thresholds]
     
+    # Smooth to suppress noise spikes
     densities_smooth = uniform_filter1d(densities, size=7)
     
-    d1 = np.gradient(densities_smooth)
-    d2 = np.gradient(d1)
+    # Second derivative for max curvature (Elbow)
+    d2 = np.gradient(np.gradient(densities_smooth))
     knee_idx = int(np.argmax(np.abs(d2)))
     optimal_t = float(thresholds[knee_idx])
     
-    lo, hi = threshold_bounds
-    optimal_t = float(np.clip(optimal_t, lo, hi))
+    # Nature-grade guard: Clamp to clinically valid range
+    optimal_t = float(np.clip(optimal_t, threshold_bounds[0], threshold_bounds[1]))
     
-    print(f"  [Graph-Opt] Dynamic threshold (raw elbow): {thresholds[knee_idx]:.3f} → clamped to: {optimal_t:.3f} (bounds={threshold_bounds})")
-    log_process("graph", "adjacency_threshold_selected", raw=f"{thresholds[knee_idx]:.3f}", clamped=f"{optimal_t:.3f}", bounds=threshold_bounds)
+    print(f"  [Graph-Opt] Dynamic threshold (raw elbow): {thresholds[knee_idx]:.3f} → clamped to: {optimal_t:.3f}")
+    log_process("graph", "adjacency_threshold_selected", raw=f"{thresholds[knee_idx]:.3f}", clamped=f"{optimal_t:.3f}")
     return optimal_t
 
 def build_cooccurrence_adjacency(labels, num_classes=14, threshold=0.4, self_loops=True):
+    """
+    NATURE-GRADE FIX 1:
+    Symmetrizes raw co-occurrence counts BEFORE normalization to ensure edge weights
+    reflect UNDIRECTED joint relationships P(i∩j), avoiding corrupted row-stochastic hacks.
+    """
     co = np.zeros((num_classes, num_classes), dtype=np.float64)
     for row in labels:
         idx = np.where(row == 1)[0]
@@ -103,16 +133,23 @@ def build_cooccurrence_adjacency(labels, num_classes=14, threshold=0.4, self_loo
             for j in idx:
                 co[i, j] += 1.0
     
+    # FIX: Symmetrize raw counts first
     co_sym = (co + co.T) / 2.0
     prob = co_sym / np.maximum(co_sym.sum(1, keepdims=True), 1.0)
+    
     adj = (prob >= threshold).astype(np.float64) * prob
     
     if self_loops:
         adj += np.eye(num_classes)
+        
     deg = adj.sum(1)
     d_inv_sq = np.where(deg > 0, np.power(np.maximum(deg, 1e-12), -0.5), 0.0)
     d_inv_sq = np.diag(d_inv_sq)
     return (d_inv_sq @ adj @ d_inv_sq).astype(np.float32)
+
+# ============================================================
+# CALIBRATION & UNCERTAINTY (ICML 2017 STANDARDS)
+# ============================================================
 
 class EarlyStopping:
     def __init__(self, patience=7, delta=0.001, path="best.pth"):
@@ -135,6 +172,7 @@ class EarlyStopping:
         return False
 
 class TemperatureScaler(nn.Module):
+    """Guo et al., ICML 2017: Learns scalar T to fix overconfidence."""
     def __init__(self, model):
         super().__init__()
         self.model = model
@@ -152,8 +190,7 @@ class TemperatureScaler(nn.Module):
         with torch.no_grad():
             for feats, lbls in val_loader:
                 logits = self.model(feats.to(device_))
-                if isinstance(logits, tuple):
-                    logits = logits[0]
+                if isinstance(logits, tuple): logits = logits[0]
                 all_logits.append(logits.cpu())
                 all_labels.append(lbls)
             calib_device = self.temperature.device
@@ -173,6 +210,7 @@ class TemperatureScaler(nn.Module):
         return T_opt
 
 def expected_calibration_error(probs, labels, n_bins=15):
+    """Per-class ECE with equal-width binning."""
     ece = []
     for k in range(probs.shape[1]):
         bounds = np.linspace(0, 1, n_bins + 1)
@@ -191,12 +229,14 @@ def brier_score_multilabel(probs, labels):
     return np.array([brier_score_loss(labels[:, k], probs[:, k]) for k in range(probs.shape[1])])
 
 def compute_logit_adjustment(train_labels_np, tau=1.0):
+    """Menon et al., ICLR 2021: Logit Adjustment for long-tail learning."""
     pos_freq = np.mean(train_labels_np, axis=0)
     pos_freq = np.clip(pos_freq, 1e-5, 1.0 - 1e-5)
     adjustment = tau * np.log(pos_freq / (1.0 - pos_freq))
     return torch.from_numpy(adjustment.astype(np.float32))
 
 def optimise_thresholds(probs, labels, grid_steps=100):
+    """Optimises binary thresholds to maximise per-class F1."""
     n_cls = probs.shape[1]
     thr = np.full(n_cls, 0.5)
     grid = np.linspace(0.05, 0.95, grid_steps)
@@ -209,58 +249,20 @@ def optimise_thresholds(probs, labels, grid_steps=100):
                 thr[k] = t
     return thr
 
-class MultiLabelConformalPredictor:
-    def __init__(self, alpha=0.10):
-        self.alpha = alpha
-        self.thresholds = None
-
-    def calibrate(self, cal_probs, cal_labels):
-        K = cal_probs.shape[1]
-        self.thresholds = np.zeros(K)
-        a_k = self.alpha / K
-        for k in range(K):
-            scores = np.where(cal_labels[:, k] == 1, 1.0 - cal_probs[:, k], cal_probs[:, k])
-            n = scores.shape[0]
-            q = min(np.ceil((1 - a_k) * (n + 1)) / n, 1.0)
-            self.thresholds[k] = np.quantile(scores, q)
-        print(f"✓ Conformal calibrated (α={self.alpha}, Bonferroni over {K} classes).")
-        log_process("calibration", "conformal_calibrated", alpha=self.alpha, classes=K)
-
-    def predict_sets(self, probs):
-        inc_pos = probs >= (1.0 - self.thresholds)
-        inc_neg = probs <= self.thresholds
-        return {
-            "include_pos": inc_pos,
-            "include_neg": inc_neg,
-            "set_sizes": inc_pos.astype(int) + inc_neg.astype(int),
-        }
-
-    def evaluate_coverage(self, probs, labels):
-        ps = self.predict_sets(probs)
-        tis = np.where(labels.astype(int) == 1, ps["include_pos"], ps["include_neg"])
-        pc = tis.mean(axis=0)
-        return {
-            "mean_coverage": float(np.mean(pc)),
-            "min_coverage": float(np.min(pc)),
-            "joint_coverage": float(tis.all(axis=1).mean()),
-            "avg_set_size_per_label": float(ps["set_sizes"].mean()),
-            "avg_set_size_per_sample": float(ps["set_sizes"].sum(1).mean()),
-            "target_coverage": 1 - self.alpha,
-            "per_class_coverage": pc.tolist(),
-        }
+# ============================================================
+# STATISTICAL ANALYSIS & BOOTSTRAP
+# ============================================================
 
 def bootstrap_metric_ci(fn, y_true, y_score, n=2000, alpha=0.05, seed=42):
+    """Calculates 95% CI for any metric using bootstrapping."""
     rng, N, vals = np.random.RandomState(seed), y_true.shape[0], []
     for _ in range(n):
         idx = rng.choice(N, N, replace=True)
         try:
             v = float(fn(y_true[idx], y_score[idx]))
-            if np.isfinite(v):
-                vals.append(v)
-        except ValueError:
-            pass
-    if not vals:
-        return dict(mean=float("nan"), ci_low=float("nan"), ci_high=float("nan"), se=float("nan"), n_valid=0)
+            if np.isfinite(v): vals.append(v)
+        except ValueError: pass
+    if not vals: return dict(mean=np.nan, ci_low=np.nan, ci_high=np.nan)
     a = np.array(vals)
     return dict(
         mean=float(a.mean()),
@@ -271,18 +273,15 @@ def bootstrap_metric_ci(fn, y_true, y_score, n=2000, alpha=0.05, seed=42):
     )
 
 def paired_bootstrap_metric_test(fn, y_true, ya, yb, n=2000, seed=42):
+    """Paired bootstrap test for difference in metrics between two models."""
     rng, N, diffs = np.random.RandomState(seed), y_true.shape[0], []
     for _ in range(n):
         idx = rng.choice(N, N, replace=True)
         try:
-            da = float(fn(y_true[idx], ya[idx]))
-            db = float(fn(y_true[idx], yb[idx]))
-            if np.isfinite(da) and np.isfinite(db):
-                diffs.append(da - db)
-        except ValueError:
-            pass
-    if not diffs:
-        return dict(delta=float("nan"), ci_low=float("nan"), ci_high=float("nan"), p_value=float("nan"), n_valid=0)
+            da, db = float(fn(y_true[idx], ya[idx])), float(fn(y_true[idx], yb[idx]))
+            if np.isfinite(da) and np.isfinite(db): diffs.append(da - db)
+        except ValueError: pass
+    if not diffs: return dict(delta=np.nan, p_value=np.nan)
     a = np.array(diffs)
     return dict(
         delta=float(a.mean()),
