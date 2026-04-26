@@ -6,7 +6,6 @@ from tqdm.auto import tqdm
 from sklearn.metrics import roc_auc_score, f1_score, average_precision_score
 from sklearn.exceptions import UndefinedMetricWarning
 
-# ── NATURE-GRADE: ვაუქმებთ მულტი-ლეიბლ სპამს იშვიათ კლასებზე ──
 warnings.filterwarnings("ignore", category=UndefinedMetricWarning)
 
 from config import log_process
@@ -36,14 +35,13 @@ class DeepEnsembleTTAEvaluator:
         log_process("ensemble", "initialization_completed", members=len(self.models), mc_passes=self.T)
 
     @torch.no_grad()
-    def evaluate(self, loader, class_names=None):
+    def evaluate(self, loader, thresholds=None):
         all_preds, all_mc_vars, all_lbls = [], [], []
         for feats, lbls in tqdm(loader, desc="  Bayesian Inference", leave=False):
             feats = feats.to(self.device)
             batch_model_means, batch_model_vars = [], []
             for m in self.models:
                 m.eval()
-                # ვააქტიურებთ Dropout-ს Monte Carlo Stochasticity-სთვის
                 for module in m.modules():
                     if isinstance(module, nn.Dropout): module.train()
                 
@@ -51,11 +49,11 @@ class DeepEnsembleTTAEvaluator:
                 for _ in range(self.T):
                     out = m(feats)
                     logits = out[0] if isinstance(out, tuple) else out
-                    mc_passes.append(torch.sigmoid(logits).cpu().numpy())
+                    prob, _, _ = get_evidential_metrics(logits)
+                    mc_passes.append(prob.cpu().numpy())
                 
                 mc_arr = np.stack(mc_passes, axis=0)
                 batch_model_means.append(mc_arr.mean(axis=0))
-                # FIX 3: Aleatoric Variance from MC Dropout
                 batch_model_vars.append(mc_arr.var(axis=0, ddof=1))
             
             all_preds.append(np.stack(batch_model_means, axis=0))
@@ -67,26 +65,30 @@ class DeepEnsembleTTAEvaluator:
         lbls = np.concatenate(all_lbls, axis=0)
         
         predictive_mean = ens.mean(axis=0)
-        epistemic_var = ens.var(axis=0) # იქნება 0 თუ M=1
-        aleatoric_var = mc_vars_all.mean(axis=0) # სწორი MC-Dropout გაურკვევლობა
+        epistemic_var = ens.var(axis=0) 
+        aleatoric_var = mc_vars_all.mean(axis=0) 
         total_var = epistemic_var + aleatoric_var
 
+        if thresholds is None:
+            thresholds = np.full(lbls.shape[1], 0.5)
+        
+        preds_binary = (predictive_mean >= thresholds).astype(int)
+        
         try: 
             auc = roc_auc_score(lbls, predictive_mean, average="macro")
         except ValueError: 
             auc = float("nan")
             
-        f1 = f1_score(lbls, (predictive_mean > 0.5).astype(int), average="macro")
+        f1 = f1_score(lbls, preds_binary, average="macro")
         ece = expected_calibration_error(predictive_mean, lbls)
 
-        log_process("ensemble", "evaluation_completed", auc=f"{auc:.4f}", f1_at_05=f"{f1:.4f}", 
-                    ece_mean=f"{ece.mean():.4f}", epistemic_mean=f"{epistemic_var.mean():.6f}", 
-                    aleatoric_mean=f"{aleatoric_var.mean():.6f}", total_var_mean=f"{total_var.mean():.6f}")
+        log_process("ensemble", "evaluation_completed", auc=f"{auc:.4f}", f1_macro=f"{f1:.4f}", 
+                    ece_mean=f"{ece.mean():.4f}", total_var_mean=f"{total_var.mean():.6f}")
 
         return {
             "auc": auc, "f1": f1, "ece": ece, "predictive_mean": predictive_mean,
             "epistemic_variance": epistemic_var, "aleatoric_variance": aleatoric_var,
-            "total_variance": total_var, "labels": lbls, "per_class_ece": ece,
+            "total_var": total_var, "labels": lbls, "per_class_ece": ece,
         }
 
 
@@ -97,69 +99,61 @@ class EvidentialEvaluator:
         self.model.eval()
 
     @torch.no_grad()
-    def evaluate(self, loader, class_names=None):
-        all_probs, all_epistemic, all_aleatoric, all_lbls = [], [], [], []
+    def evaluate(self, loader, thresholds=None):
+        all_probs, all_epistemic, all_lbls = [], [], []
         for feats, lbls in tqdm(loader, desc="  Evidential Inference", leave=False):
-            feats = feats.to(self.device)
-            out = self.model(feats)
-            logits = out[0] if isinstance(out, tuple) else out
-            
-            prob, epistemic, aleatoric = get_evidential_metrics(logits)
+            logits = self.model(feats.to(self.device))
+            if isinstance(logits, tuple): logits = logits[0]
+            prob, epistemic, _ = get_evidential_metrics(logits)
             
             all_probs.append(prob.cpu().numpy())
             all_epistemic.append(epistemic.cpu().numpy())
-            all_aleatoric.append(aleatoric.cpu().numpy())
             all_lbls.append(lbls.numpy())
         
         probs = np.concatenate(all_probs, axis=0)
-        epistemic_var = np.concatenate(all_epistemic, axis=0)
-        aleatoric_var = np.concatenate(all_aleatoric, axis=0)
+        epistemic = np.concatenate(all_epistemic, axis=0)
         lbls = np.concatenate(all_lbls, axis=0)
-        total_var = epistemic_var + aleatoric_var
 
-        try: 
-            auc = roc_auc_score(lbls, probs, average="macro")
-        except ValueError: 
-            auc = float("nan")
+        if thresholds is None: thresholds = np.full(lbls.shape[1], 0.5)
+        
+        preds_binary = (probs >= thresholds).astype(int)
+        try: auc = roc_auc_score(lbls, probs, average="macro")
+        except ValueError: auc = float("nan")
             
-        f1 = f1_score(lbls, (probs > 0.5).astype(int), average="macro")
+        f1 = f1_score(lbls, preds_binary, average="macro")
         ece = expected_calibration_error(probs, lbls)
-
-        log_process("evidential", "evaluation_completed", auc=f"{auc:.4f}", f1_at_05=f"{f1:.4f}", 
-                    ece_mean=f"{ece.mean():.4f}", epistemic_mean=f"{epistemic_var.mean():.6f}", 
-                    aleatoric_mean=f"{aleatoric_var.mean():.6f}", total_var_mean=f"{total_var.mean():.6f}")
 
         return {
             "auc": auc, "f1": f1, "ece": ece, "predictive_mean": probs,
-            "epistemic_variance": epistemic_var, "aleatoric_variance": aleatoric_var,
-            "total_variance": total_var, "labels": lbls, "per_class_ece": ece,
+            "epistemic_variance": epistemic, "labels": lbls, "per_class_ece": ece
         }
 
 
-def validate(model, loader, device_):
+def validate(model, loader, device_, thresholds=None):
     model.eval()
     all_p, all_l = [], []
     with torch.no_grad():
         for feats, lbls in tqdm(loader, desc="  Val", leave=False):
-            out = model(feats.to(device_))
-            logits = out[0] if isinstance(out, tuple) else out
-            preds = torch.sigmoid(logits)
-            all_p.append(preds.cpu().numpy())
+            logits = model(feats.to(device_))
+            if isinstance(logits, tuple): logits = logits[0]
+            probs, _, _ = get_evidential_metrics(logits)
+            all_p.append(probs.cpu().numpy())
             all_l.append(lbls.numpy())
             
     P, L = np.vstack(all_p), np.vstack(all_l)
     
-    # უსაფრთხო Exception Handling
+    if thresholds is None: thresholds = np.full(P.shape[1], 0.5)
+    
     try: 
         auc = roc_auc_score(L, P, average="macro")
     except ValueError: 
         auc = 0.5
         
-    try: 
+    try:
         mAP = average_precision_score(L, P, average="macro")
-    except ValueError: 
+    except ValueError:
         mAP = 0.0
         
-    f1 = f1_score(L, (P > 0.5).astype(int), average="macro")
+    f1 = f1_score(L, (P >= thresholds).astype(int), average="macro")
     
     return auc, f1, mAP, P, L

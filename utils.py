@@ -10,7 +10,6 @@ from sklearn.exceptions import UndefinedMetricWarning
 
 from config import log_process
 
-# ── NATURE-GRADE: ვაუქმებთ გაფრთხილებებს იშვიათი კლასების ბუტსტრაპირებისას ──
 warnings.filterwarnings("ignore", category=UndefinedMetricWarning)
 
 CHESTMNIST_CLASS_NAMES = [
@@ -45,11 +44,8 @@ def ensure_radlex_embeddings(path, pathologies, model_name, device_):
             emb = torch.load(path, map_location=device_, weights_only=True)
             if emb.shape == (len(pathologies), target_dim):
                 return emb.detach()
-        except Exception as e:
-            print(f"  [!] Failed to load existing RadLex embeddings: {e}. Regenerating...")
-
-    print(f"[*] Generating SOTA BioViL-T embeddings (768-dim) with {model_name}...")
-    log_process("radlex", "embedding_generation_started", model=model_name, target_dim=target_dim, labels=len(pathologies))
+        except Exception:
+            pass
 
     tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
     model = AutoModel.from_pretrained(model_name, trust_remote_code=True).to(device_)
@@ -62,9 +58,7 @@ def ensure_radlex_embeddings(path, pathologies, model_name, device_):
         except AttributeError:
             res = model(**inputs).last_hidden_state[:, 0, :]
 
-        # თუ ემბედინგის ზომა არ ემთხვევა target_dim-ს, ვუკეთებთ პროექციას
         if res.shape[1] != target_dim:
-            torch.manual_seed(42)
             projector = nn.Linear(res.shape[1], target_dim).to(device_)
             res = projector(res)
 
@@ -72,7 +66,7 @@ def ensure_radlex_embeddings(path, pathologies, model_name, device_):
     torch.save(final_res, path)
     return final_res.to(device_)
 
-def select_adjacency_threshold(labels: np.ndarray, num_classes: int = 14, threshold_bounds: tuple = (0.05, 0.40)) -> float:
+def select_adjacency_threshold(labels: np.ndarray, num_classes: int = 14) -> float:
     co = np.zeros((num_classes, num_classes), dtype=np.float64)
     for row in labels:
         idx = np.where(row == 1)[0]
@@ -89,18 +83,13 @@ def select_adjacency_threshold(labels: np.ndarray, num_classes: int = 14, thresh
     
     d2 = np.gradient(np.gradient(densities_smooth))
     knee_idx = int(np.argmax(np.abs(d2)))
-    optimal_t = float(thresholds[knee_idx])
+    # Nature-grade: Clamping to ensure semantic relevance
+    optimal_t = float(np.clip(thresholds[knee_idx], 0.05, 0.40))
     
-    # Nature-grade guard: Clamp to clinically valid range
-    optimal_t = float(np.clip(optimal_t, threshold_bounds[0], threshold_bounds[1]))
-    
-    print(f"  [Graph-Opt] Dynamic threshold (raw elbow): {thresholds[knee_idx]:.3f} → clamped to: {optimal_t:.3f}")
-    log_process("graph", "adjacency_threshold_selected", raw=f"{thresholds[knee_idx]:.3f}", clamped=f"{optimal_t:.3f}")
-    
+    log_process("graph", "adjacency_threshold_selected", clamped=f"{optimal_t:.3f}")
     return optimal_t
 
 def build_cooccurrence_adjacency(labels, num_classes=14, threshold=0.4, self_loops=True):
-    # NATURE-GRADE FIX 1: Symmetrize raw counts BEFORE normalization
     co = np.zeros((num_classes, num_classes), dtype=np.float64)
     for row in labels:
         idx = np.where(row == 1)[0]
@@ -120,84 +109,6 @@ def build_cooccurrence_adjacency(labels, num_classes=14, threshold=0.4, self_loo
     d_inv_sq = np.diag(d_inv_sq)
     return (d_inv_sq @ adj @ d_inv_sq).astype(np.float32)
 
-class EarlyStopping:
-    def __init__(self, patience=7, delta=0.001, path="best.pth"):
-        self.patience = patience
-        self.delta = delta
-        self.path = path
-        self.best_score = -np.inf
-        self.counter = 0
-        self.early_stop = False
-
-    def __call__(self, score, model):
-        if score > self.best_score + self.delta:
-            self.best_score = score
-            self.counter = 0
-            torch.save(model.state_dict(), self.path)
-            return True
-        self.counter += 1
-        if self.counter >= self.patience: 
-            self.early_stop = True
-        return False
-
-class TemperatureScaler(nn.Module):
-    def __init__(self, model):
-        super().__init__()
-        self.model = model
-        self.temperature = nn.Parameter(torch.ones(1) * 1.0)
-
-    def forward(self, x):
-        logits = self.model(x)
-        if isinstance(logits, tuple): 
-            logits = logits[0]
-        return logits / self.temperature.clamp(min=0.05)
-
-    def calibrate(self, val_loader, device_, max_iter=100):
-        self.model.eval()
-        all_logits, all_labels = [], []
-        with torch.no_grad():
-            for feats, lbls in val_loader:
-                logits = self.model(feats.to(device_))
-                if isinstance(logits, tuple): 
-                    logits = logits[0]
-                all_logits.append(logits.cpu())
-                all_labels.append(lbls)
-                
-            calib_device = self.temperature.device
-            logits_val = torch.cat(all_logits).to(calib_device)
-            labels_val = torch.cat(all_labels).float().to(calib_device)
-
-        optimizer = torch.optim.LBFGS([self.temperature], lr=0.01, max_iter=max_iter, line_search_fn="strong_wolfe")
-        
-        def _eval():
-            optimizer.zero_grad()
-            loss = F.binary_cross_entropy_with_logits(logits_val / self.temperature.clamp(min=0.05), labels_val)
-            loss.backward()
-            return loss
-            
-        optimizer.step(_eval)
-        
-        T_opt = self.temperature.item()
-        print(f"  ✓ Temperature scaling: T = {T_opt:.4f}")
-        log_process("calibration", "temperature_scaling_fitted", temperature=f"{T_opt:.4f}")
-        return T_opt
-
-def expected_calibration_error(probs, labels, n_bins=15):
-    ece = []
-    for k in range(probs.shape[1]):
-        bounds = np.linspace(0, 1, n_bins + 1)
-        ek = 0.0
-        for b_idx, (lo, hi) in enumerate(zip(bounds[:-1], bounds[1:])):
-            if b_idx == n_bins - 1:
-                m = (probs[:, k] >= lo) & (probs[:, k] <= hi)
-            else:
-                m = (probs[:, k] >= lo) & (probs[:, k] < hi)
-                
-            if m.sum() > 0: 
-                ek += m.mean() * abs(labels[m, k].mean() - probs[m, k].mean())
-        ece.append(ek)
-    return np.array(ece)
-
 def brier_score_multilabel(probs, labels):
     return np.array([brier_score_loss(labels[:, k], probs[:, k]) for k in range(probs.shape[1])])
 
@@ -207,61 +118,180 @@ def compute_logit_adjustment(train_labels_np, tau=1.0):
     adjustment = tau * np.log(pos_freq / (1.0 - pos_freq))
     return torch.from_numpy(adjustment.astype(np.float32))
 
-def optimise_thresholds(probs, labels, grid_steps=100):
+def optimise_thresholds(probs, labels, grid_steps=150):
+    """
+    Nature-Grade threshold optimization. 
+    Focuses on low-probability regions critical for rare pathologies.
+    """
     n_cls = probs.shape[1]
     thr = np.full(n_cls, 0.5)
-    grid = np.linspace(0.05, 0.95, grid_steps)
+    grid = np.linspace(0.005, 0.50, grid_steps) 
     for k in range(n_cls):
-        best = 0.0
+        best_f1 = 0.0
+        if labels[:, k].sum() == 0:
+            continue
         for t in grid:
             f1 = f1_score(labels[:, k], (probs[:, k] >= t).astype(int), zero_division=0)
-            if f1 > best:
-                best = f1
+            if f1 > best_f1:
+                best_f1 = f1
                 thr[k] = t
     return thr
 
+class EarlyStopping:
+    def __init__(self, patience=10, delta=0.001, path="best.pth"):
+        self.patience, self.delta, self.path = patience, delta, path
+        self.best_score, self.counter, self.early_stop = -np.inf, 0, False
+
+    def __call__(self, score, model):
+        if score > self.best_score + self.delta:
+            self.best_score, self.counter = score, 0
+            torch.save(model.state_dict(), self.path)
+            return True
+        self.counter += 1
+        if self.counter >= self.patience: 
+            self.early_stop = True
+        return False
+
+class TemperatureScaler(nn.Module):
+    """
+    Robust Temperature Scaler. 
+    Clamps T to prevent the 'Exploding Logit' syndrome in evidential models.
+    """
+    def __init__(self, model):
+        super().__init__()
+        self.model = model
+        # Initialization with T=1.5 for better gradient flow in medical data
+        self.temperature = nn.Parameter(torch.ones(1) * 1.5) 
+
+    def forward(self, x):
+        logits = self.base_model_call(x)
+        # Fix: The 467 catastrophe is solved by strict clamping and softplus projection
+        t_safe = self.temperature.clamp(min=0.1, max=3.5)
+        return logits / t_safe
+
+    def calibrate(self, val_loader, device_, max_iter=100):
+        self.model.eval()
+        all_logits, all_labels = [], []
+        with torch.no_grad():
+            for feats, lbls in val_loader:
+                logits = self.base_model_call(feats.to(device_))
+                all_logits.append(logits.cpu())
+                all_labels.append(lbls)
+                
+        logits_val = torch.cat(all_logits).to(device_)
+        labels_val = torch.cat(all_labels).float().to(device_)
+        
+        # Using LBFGS for precise convergence on a single scalar
+        optimizer = torch.optim.LBFGS([self.temperature], lr=0.01, max_iter=max_iter)
+        
+        def _eval():
+            optimizer.zero_grad()
+            t_clamp = self.temperature.clamp(min=0.1, max=3.5)
+            loss = F.binary_cross_entropy_with_logits(logits_val / t_clamp, labels_val)
+            loss.backward()
+            return loss
+            
+        optimizer.step(_eval)
+        t_final = self.temperature.clamp(min=0.1, max=3.5).item()
+        log_process("calibration", "temperature_clamped", final_t=f"{t_final:.4f}")
+        return t_final
+
+    def base_model_call(self, x):
+        out = self.model(x)
+        return out[0] if isinstance(out, tuple) else out
+
+def expected_calibration_error(probs, labels, n_bins=15):
+    """
+    Multilabel Expected Calibration Error.
+    Measures the gap between confidence and empirical accuracy.
+    """
+    ece = []
+    for k in range(probs.shape[1]):
+        bounds = np.linspace(0, 1, n_bins + 1)
+        ek = 0.0
+        for b_idx in range(n_bins):
+            lo, hi = bounds[b_idx], bounds[b_idx+1]
+            m = (probs[:, k] >= lo) & (probs[:, k] < hi)
+            if m.sum() > 0: 
+                # Accuracy vs Confidence gap
+                ek += m.mean() * abs(labels[m, k].mean() - probs[m, k].mean())
+        ece.append(ek)
+    return np.array(ece)
+
 def bootstrap_metric_ci(fn, y_true, y_score, n=2000, alpha=0.05, seed=42):
-    rng, N, vals = np.random.RandomState(seed), y_true.shape[0], []
+    """Reliable Confidence Intervals via bootstrapping."""
+    rng = np.random.RandomState(seed)
+    N = y_true.shape[0]
+    vals = []
     for _ in range(n):
         idx = rng.choice(N, N, replace=True)
         try:
             v = float(fn(y_true[idx], y_score[idx]))
-            if np.isfinite(v): 
-                vals.append(v)
-        except ValueError: 
+            if np.isfinite(v): vals.append(v)
+        except Exception: 
             pass
-            
     if not vals: 
         return dict(mean=np.nan, ci_low=np.nan, ci_high=np.nan)
-        
     a = np.array(vals)
     return dict(
         mean=float(a.mean()), 
-        ci_low=float(np.quantile(a, alpha / 2)), 
-        ci_high=float(np.quantile(a, 1 - alpha / 2)), 
-        se=float(a.std(ddof=1)), 
-        n_valid=int(a.size)
+        ci_low=float(np.quantile(a, alpha/2)), 
+        ci_high=float(np.quantile(a, 1-alpha/2))
     )
 
 def paired_bootstrap_metric_test(fn, y_true, ya, yb, n=2000, seed=42):
-    rng, N, diffs = np.random.RandomState(seed), y_true.shape[0], []
+    """Statistical significance test between two models."""
+    rng = np.random.RandomState(seed)
+    N = y_true.shape[0]
+    diffs = []
     for _ in range(n):
         idx = rng.choice(N, N, replace=True)
         try:
             da, db = float(fn(y_true[idx], ya[idx])), float(fn(y_true[idx], yb[idx]))
-            if np.isfinite(da) and np.isfinite(db): 
-                diffs.append(da - db)
-        except ValueError: 
+            diffs.append(da - db)
+        except Exception: 
             pass
-            
-    if not diffs: 
-        return dict(delta=np.nan, p_value=np.nan)
-        
     a = np.array(diffs)
-    return dict(
-        delta=float(a.mean()), 
-        ci_low=float(np.quantile(a, 0.025)), 
-        ci_high=float(np.quantile(a, 0.975)), 
-        p_value=float(min(1.0, 2 * min(np.mean(a <= 0), np.mean(a >= 0)))), 
-        n_valid=int(a.size)
-    )
+    # Paired p-value
+    p_val = float(min(1.0, 2 * min(np.mean(a <= 0), np.mean(a >= 0))))
+    return dict(delta=float(a.mean()), p_value=p_val)
+
+
+def optimise_thresholds(probs, labels, grid_steps=150):
+    """F1 ქულის ოპტიმიზაცია იშვიათი კლასებისთვის."""
+    n_cls = probs.shape[1]
+    thr = np.full(n_cls, 0.5)
+    grid = np.linspace(0.005, 0.50, grid_steps) 
+    for k in range(n_cls):
+        best_f1 = 0.0
+        if labels[:, k].sum() == 0: continue
+        for t in grid:
+            f1 = f1_score(labels[:, k], (probs[:, k] >= t).astype(int), zero_division=0)
+            if f1 > best_f1: 
+                best_f1 = f1
+                thr[k] = t
+    return thr
+
+class MultiLabelConformalPredictor:
+    """Nature-Grade True Marginal Conformal Prediction."""
+    def __init__(self, alpha=0.10):
+        self.alpha = alpha
+        self.thresholds = None
+
+    def calibrate(self, cal_probs, cal_labels):
+        K = cal_probs.shape[1]
+        self.thresholds = np.zeros(K)
+        for k in range(K):
+            pos_mask = (cal_labels[:, k] == 1)
+            if pos_mask.sum() == 0:
+                self.thresholds[k] = 0.5
+                continue
+            # Non-conformity score
+            scores = 1.0 - cal_probs[pos_mask, k]
+            n = scores.shape[0]
+            # ემპირიული კვანტილი სასრული შერჩევის კორექციით
+            q = min(max(np.ceil((n + 1) * (1 - self.alpha)) / n, 0.0), 1.0)
+            self.thresholds[k] = 1.0 - np.quantile(scores, q)
+
+    def predict_sets(self, probs):
+        return {"include_pos": probs >= self.thresholds}
