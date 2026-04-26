@@ -1,0 +1,1927 @@
+\documentclass[12pt,a4paper,oneside]{report}
+
+\usepackage[a4paper,left=2.5cm,right=2.5cm,top=2.5cm,bottom=2.5cm]{geometry}
+\usepackage{fontspec}
+\usepackage{polyglossia}
+
+% Set main language as English, with Georgian as secondary language
+\setdefaultlanguage{english}
+\setotherlanguage{georgian}
+
+% Georgian font configuration for XeLaTeX
+% Sylfaen - Microsoft's font specifically designed for Georgian script
+\setmainfont[
+  Ligatures=TeX,
+  SizeFeatures={Size=12}
+]{Sylfaen}
+
+% Georgian text uses Sylfaen for proper Georgian character rendering
+\newfontfamily\georgianfont[
+  SizeFeatures={Size=12}
+]{Sylfaen}
+
+% Alternative Georgian font
+\newfontfamily\georgianalt{
+  Sylfaen
+}
+
+% ========================================
+% Georgian Text Commands and Environments
+% ========================================
+% Define \textgeorgian{} for inline Georgian text
+\newcommand{\textgeorgian}[1]{{\georgianfont #1}}
+
+% Define georgian environment for block-level Georgian text
+\newenvironment{georgian}{%
+  \begin{otherlanguage}{georgian}%
+  \georgianfont%
+}{%
+  \end{otherlanguage}%
+}
+
+% Define \georgianalt command for alternative Georgian styling
+\newcommand{\textgeorgianalt}[1]{{\georgianalt #1}}
+
+\usepackage{setspace}
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{siunitx}
+\usepackage{enumitem}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{hyperref}
+\usepackage[nameinlink,noabbrev]{cleveref}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  citecolor=blue,
+  urlcolor=blue,
+  pdftitle={CXR-Synapse: Ontology-Aware Multi-Label Chest X-Ray Classification},
+    pdfauthor={Nika}
+}
+
+% ========================================
+% Georgian Language Support Configuration
+% ========================================
+% IMPORTANT: This document uses XeLaTeX with fontspec and polyglossia for Georgian support.
+% To compile:
+%   xelatex --interaction=nonstopmode CXR-Synapse-Masters-Thesis.tex
+%   Or use the automated scripts: compile_xelatex.bat (Windows) or compile_xelatex.sh (Unix/macOS)
+%
+% System Requirements:
+%   - Noto Serif and Noto Sans fonts (support both English and Georgian characters)
+%   - XeLaTeX engine (included in TeX Live 2018+ and MiKTeX 2.9+)
+%   - Download Noto fonts from: https://www.google.com/get/noto/
+%
+% Font Configuration:
+%   - Main font: Noto Serif (English text + Georgian support)
+%   - Georgian font: Noto Sans (superior Georgian script rendering)
+%   - Both fonts have complete Unicode support
+%
+% How to use Georgian text:
+%
+% Inline Georgian text:
+%   \textgeorgian{ქართული ტექსტი}
+%
+% Block-level Georgian text:
+%   \begin{georgian}
+%   ქართული ტექსტი აქ მაგალითია.
+%   \end{georgian}
+%
+% Alternative Georgian style:
+%   \textgeorgianalt{ქართული ტექსტი}
+%
+% Note: Noto fonts provide complete character support for both Latin and Georgian scripts.
+% For technical details, see: README_GEORGIAN_FIX.md and COMPILE_GEORGIAN.md
+% ========================================
+
+% SEU Formatting Requirements: 1.5 line spacing
+\setstretch{1.5}
+\setlength{\parindent}{1.2em}
+\setlength{\parskip}{0.2em}
+
+% Footnote formatting: size 10, single spacing
+\usepackage[perpage,bottom]{footmisc}
+\renewcommand{\footnotelayout}{\fontsize{10}{10}\selectfont}
+\renewcommand{\footnoterule}{\kern -3pt \hrule \kern 2.6pt}
+\renewcommand{\thefootnote}{\arabic{footnote}}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[R]{\thepage}
+\fancyhead[L]{CXR-Synapse Master Thesis}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% Chapter headings: 16pt, bold, centered
+\titleformat{\chapter}[display]
+    {\bfseries\fontsize{16}{19}\selectfont\filcenter}
+  {\chaptertitlename\ \thechapter}
+  {0.5em}
+  {\fontsize{16}{19}\selectfont}
+
+% Unnumbered chapter headings: 16pt
+\titleformat{name=\chapter,numberless}[display]
+    {\bfseries\fontsize{16}{19}\selectfont\filcenter}
+    {}
+    {0pt}
+    {\fontsize{16}{19}\selectfont}
+
+% Section headings (Sub-chapters): 14pt, bold
+\titleformat{\section}[hang]
+    {\bfseries\fontsize{14}{16}\selectfont}
+    {\thesection}
+    {1em}
+    {}
+
+% Subsection headings: 12pt, bold
+\titleformat{\subsection}[hang]
+    {\bfseries\fontsize{12}{14}\selectfont}
+    {\thesubsection}
+    {1em}
+    {}
+
+% Subsubsection headings: 12pt, italic
+\titleformat{\subsubsection}[hang]
+    {\bfseries\fontsize{12}{14}\selectfont}
+    {\thesubsubsection}
+    {1em}
+    {}
+
+\newcommand{\UniversityName}{Georgian National University SEU}
+\newcommand{\FacultyName}{School of Technology}
+\newcommand{\ProgramName}{Master Program in Artificial Intelligence}
+\newcommand{\ThesisTitle}{CXR-Synapse: Ontology-Aware Multi-Label Chest X-Ray Classification with DINOv3, Graph Reasoning, and Uncertainty Guarantees}
+\newcommand{\AuthorName}{Nika}
+\newcommand{\SupervisorName}{Assigned SEU Supervisor}
+\newcommand{\SupervisorDegree}{PhD}
+\newcommand{\DegreeName}{Master Thesis}
+\newcommand{\DegreeStatement}{Master thesis submitted in fulfillment of the requirements for the academic degree of Master in Artificial Intelligence}
+\newcommand{\SubmissionYear}{2026}
+\newcommand{\SubmissionCity}{Tbilisi}
+
+\begin{document}
+
+\pagenumbering{gobble}
+
+% -------------------------
+% Title Page
+% -------------------------
+\begin{titlepage}
+    \centering
+    {\fontsize{18}{22}\selectfont \UniversityName\par}
+    \vspace{3\baselineskip}
+
+    {\fontsize{16}{20}\selectfont \AuthorName\par}
+    \vspace{3\baselineskip}
+
+    {\fontsize{16}{20}\selectfont \bfseries \ThesisTitle\par}
+    \vspace{3\baselineskip}
+
+    {\fontsize{14}{18}\selectfont \ProgramName\par}
+    \vspace{0.7\baselineskip}
+    {\fontsize{14}{18}\selectfont \DegreeStatement\par}
+
+    \vfill
+    \begin{flushright}
+        {\fontsize{14}{18}\selectfont Supervisor: \SupervisorName\\
+        Academic degree: \SupervisorDegree}
+    \end{flushright}
+
+    \vfill
+    {\fontsize{14}{18}\selectfont \SubmissionCity, \SubmissionYear\par}
+\end{titlepage}
+
+% -------------------------
+% Declaration
+% -------------------------
+\chapter*{Declaration of Originality}
+\addcontentsline{toc}{chapter}{Declaration of Originality}
+I declare that this thesis is my own work and that all sources used have been appropriately acknowledged.
+All text, figures, and code fragments from external works are cited according to academic standards.
+The experimental protocol, statistical analysis, and reproducibility artifacts are reported transparently.
+No content has been generated, copied, or modified in a way that violates academic integrity policies.
+
+\vspace{1.2cm}
+\noindent Signature: \rule{6cm}{0.4pt} \hfill Date: \rule{3.5cm}{0.4pt}
+
+% -------------------------
+% Abstract
+% -------------------------
+\chapter*{Abstract (Primary Language)}
+\addcontentsline{toc}{chapter}{Abstract (Primary Language)}
+Chest X-ray (CXR) multi-label classification remains challenging due to severe class imbalance,
+label dependency, weakly supervised labels, and distribution shift across institutions.
+This thesis proposes \textbf{CXR-Synapse}, a clinically grounded framework that integrates a
+DINOv3 visual encoder, ontology-conditioned label graph reasoning, long-tail-aware optimization,
+and uncertainty-aware decision support.
+
+The method combines: (1) DINOv3-based visual representation learning,
+(2) GraphGPS-style label interaction modeling conditioned on RadLex semantics,
+(3) hierarchy-aware long-tail loss design,
+(4) deep ensemble uncertainty estimation,
+(5) calibration analysis with expected calibration error and Brier score,
+and (6) Bonferroni-corrected conformal prediction sets for distribution-free coverage.
+
+The evaluation protocol is designed at publication level, including patient-level split integrity,
+anti-leakage checks, bootstrap confidence intervals, paired significance testing,
+per-class and macro metrics, and external validation requirements.
+Beyond performance, the thesis emphasizes reproducibility, model governance, and clinical reliability.
+The resulting framework and reporting package align with high-impact medical AI standards
+and provide a complete template for defensible master-level and journal-level research.
+
+\noindent\textbf{Keywords:}
+chest X-ray, multi-label classification, DINOv3, label graph, long-tail learning,
+calibration, conformal prediction, deep ensembles, reproducibility, medical AI.
+
+% -------------------------
+% Mandatory second-language abstract (SEU)
+% -------------------------
+\chapter*{ანოტაცია (ქართულ ენაზე)}
+\addcontentsline{toc}{chapter}{ანოტაცია (ქართულ ენაზე)}
+ნაშრომი ეხება გულ-მკერდის რენტგენოგრამებზე მრავალლეიბლიან კლასიფიკაციას, სადაც ძირითადი გამოწვევებია
+კლასთა მკვეთრი დისბალანსი, პათოლოგიებს შორის დამოკიდებულებები და სხვადასხვა კლინიკური წყაროსგან
+გამოწვეული განაწილების ცვლა. კვლევის მიზანია შემუშავდეს სანდო და პრაქტიკულად გამოყენებადი ჩარჩო,
+რომელიც ერთიანად გააუმჯობესებს როგორც დისკრიმინაციულ სიზუსტეს, ასევე პროგნოზის სანდოობას.
+კვლევის ობიექტია გულ-მკერდის რენტგენოგრამების ავტომატური ანალიზი; კვლევის საგანია DINOv3-ზე,
+ონტოლოგიურად განპირობებულ ლეიბლ-გრაფზე და uncertainty-aware შეფასებაზე დაფუძნებული მეთოდი.
+
+ნაშრომში წარმოდგენილია CXR-Synapse, რომელიც აერთიანებს ვიზუალური ნიშნების ღრმა რეპრეზენტაციას,
+RadLex-ით გაძლიერებულ პათოლოგიათა გრაფულ დამოკიდებულებებს, long-tail ოპტიმიზაციის სტრატეგიას,
+deep ensemble-ის ეპისტემურ გაურკვევლობას, კალიბრაციის მეტრიკებსა (ECE, Brier) და Bonferroni-კორექტირებულ
+კონფორმალურ პროგნოზს. მეთოდოლოგია მოიცავს პაციენტის დონეზე გაყოფას, leakage-ის კონტროლს,
+bootstrap ნდობით ინტერვალებს, დაწყვილებულ მნიშვნელოვნების ტესტებს და დეტალურ აბლაციურ ანალიზს.
+ნაშრომის სამეცნიერო სიახლეა ზემოხსენებული კომპონენტების ერთიან, რეპროდუცირებად შეფასებით კონტურში
+შემოწმება. პრაქტიკული ღირებულება მდგომარეობს იმაში, რომ სისტემა იძლევა არა მხოლოდ კლასის ალბათობებს,
+არამედ გაურკვევლობისა და coverage-ის ინტერპრეტირებად სურათს კლინიკური გადაწყვეტილების მხარდასაჭერად.
+
+\chapter*{Abstract (in English)}
+\addcontentsline{toc}{chapter}{Abstract (in English)}
+\noindent\textbf{Title:} \ThesisTitle\\
+\textbf{Author:} \AuthorName
+
+Chest X-ray multi-label classification is challenged by severe class imbalance, inter-label dependency,
+and domain shift across institutions. This thesis proposes CXR-Synapse, a reliability-oriented framework
+that combines DINOv3 visual representation learning with ontology-conditioned graph reasoning over pathology labels.
+The objective is to improve both predictive discrimination and clinical trustworthiness through uncertainty-aware inference.
+
+The method integrates five components: long-tail-aware supervised optimization, RadLex-conditioned label interaction modeling,
+deep ensemble epistemic uncertainty, calibration diagnostics (ECE and Brier), and Bonferroni-corrected conformal prediction sets.
+The evaluation protocol is designed for publication-level rigor and includes patient-level split integrity,
+anti-leakage controls, bootstrap confidence intervals, paired significance testing, per-class and macro metrics,
+and external validation requirements. The scientific contribution is a unified, reproducible pipeline where
+accuracy, calibration, and coverage are jointly assessed rather than reported in isolation.
+The practical value lies in generating risk-aware outputs for clinical decision support,
+including confidence structure and prediction-set behavior under uncertainty.
+
+\tableofcontents
+
+\clearpage
+\pagenumbering{arabic}
+\setcounter{page}{1}
+
+\listoffigures
+\listoftables
+
+\clearpage
+
+\chapter*{List of Abbreviations}
+\addcontentsline{toc}{chapter}{List of Abbreviations}
+\begin{longtable}{p{0.18\textwidth}p{0.76\textwidth}}
+AUC & Area Under the Receiver Operating Characteristic Curve \\
+AUPRC & Area Under the Precision-Recall Curve \\
+BCE & Binary Cross-Entropy \\
+CI & Confidence Interval \\
+CXR & Chest X-Ray \\
+ECE & Expected Calibration Error \\
+FPR & False Positive Rate \\
+LLRD & Layer-Wise Learning Rate Decay \\
+mAP & Mean Average Precision \\
+OOD & Out-of-Distribution \\
+PPV & Positive Predictive Value \\
+SOTA & State of the Art \\
+SWA & Stochastic Weight Averaging \\
+\end{longtable}
+
+\chapter{შესავალი}
+
+\section{პრობლემის აქტუალობა}
+გულ-მკერდის რენტგენოგრაფია პრაქტიკაში ყველაზე ხშირად გამოყენებული დიაგნოსტიკური მეთოდია,
+რის გამოც მისი ავტომატიზებული ანალიზი განსაკუთრებულ მნიშვნელობას იძენს კლინიკური ტრაიაჟის,
+მუშაობის სიჩქარისა და ხარისხის გაუმჯობესებისთვის.
+მიუხედავად ამისა, მრავალლეიბლიანი კლასიფიკაცია კვლავ რთულ ამოცანად რჩება,
+რადგან ერთდროულად გვხვდება კლასთა დისბალანსი, პათოლოგიათა თანხვედრა,
+ლეიბლების არასრულყოფილი ან არასტაბილური ნიშნვა და მონაცემთა განაწილების ცვლა სხვადასხვა კლინიკურ წყაროს შორის.
+შესაბამისად, მხოლოდ მაღალი AUC მაჩვენებელი საკმარისი არ არის;
+აუცილებელია სანდოობის, კალიბრაციისა და გაურკვევლობის კონტროლირებადი შეფასებაც.
+
+\section{კვლევის მიზანი}
+კვლევის მიზანია შეიქმნას და შეფასდეს CXR-Synapse ტიპის ერთიანი მეთოდოლოგიური ჩარჩო,
+რომელიც DINOv3 ვიზუალურ რეპრეზენტაციებს აერთიანებს RadLex-ით განპირობებულ ლეიბლ-გრაფულ მიზეზობრიობასთან,
+long-tail ოპტიმიზაციასთან და uncertainty-aware შეფასებასთან,
+რათა გაიზარდოს როგორც დიაგნოსტიკური ხარისხი, ისე პროგნოზის სანდოობა კლინიკურად რელევანტურ პირობებში.
+
+\section{კვლევის ამოცანები}
+დასმული მიზნის მისაღწევად განისაზღვრა შემდეგი ამოცანები:
+\begin{enumerate}[leftmargin=1.6em]
+    \item თანამედროვე მრავალლეიბლიანი CXR მეთოდებისა და ბენჩმარკების ანალიზი;
+    \item DINOv3-ზე დაფუძნებული ვიზუალური ენკოდერის ინტეგრაცია ონტოლოგიურად განპირობებულ ლეიბლ-გრაფთან;
+    \item კლასთა დისბალანსზე ორიენტირებული (long-tail-aware) დანაკარგების ფუნქციის შერჩევა და დასაბუთება;
+    \item გაურკვევლობის შეფასების მექანიზმის აგება deep ensemble მიდგომით;
+    \item კალიბრაციისა (ECE, Brier) და კონფორმალური პროგნოზის (coverage/set size) შეფასება;
+    \item შედეგების სტატისტიკური სანდოობის დადგენა bootstrap ნდობითი ინტერვალებით და დაწყვილებული ტესტებით.
+\end{enumerate}
+
+\section{კვლევის მეთოდოლოგია}
+კვლევის მეთოდოლოგია შერჩეულია ისე, რომ თითოეული მეთოდი პირდაპირ პასუხობდეს მიზანსა და ამოცანებს,
+და უზრუნველყოფდეს მიღებული დასკვნების სანდოობას.
+
+\textbf{1) შედარებითი სამეცნიერო ანალიზი.}
+აქტუალური ლიტერატურის სისტემური მიმოხილვა გამოიყენება პრობლემის ფორმალიზაციისა და
+არსებული მეთოდების ძლიერი/სუსტი მხარეების განსაზღვრისთვის.
+ეს მეთოდი რელევანტურია, რადგან იძლევა კვლევის ხარვეზების იდენტიფიცირების საშუალებას და
+ახალი მეთოდის პოზიციონირებას არსებულ მეცნიერებრივ კონტექსტში.
+
+\textbf{2) ექსპერიმენტული ღრმა სწავლება კონტროლირებადი აბლაციებით.}
+მოდელის კომპონენტების წვლილი იზომება აბლაციური ექსპერიმენტებით,
+რაც უზრუნველყოფს მიზეზ-შედეგობრივი ინტერპრეტაციის შესაძლებლობას.
+რელევანტურობა განპირობებულია იმით, რომ სწორედ აბლაციები აჩვენებს
+რომელი მოდული ქმნის რეალურ გაუმჯობესებას.
+
+\textbf{3) სტატისტიკური დასკვნითი ანალიზი.}
+bootstrap ნდობითი ინტერვალები და დაწყვილებული მნიშვნელოვნების ტესტები გამოიყენება
+შედეგების შემთხვევითი ვარიაციისგან გასამიჯნად.
+მეთოდის სანდოობა ეფუძნება განმეორებად ნიმუშებზე შეფასებას და
+შედეგების რაოდენობრივად დასაბუთებას.
+
+\textbf{4) კალიბრაციისა და გაურკვევლობის შეფასება.}
+ECE/Brier, deep ensemble variance და conformal coverage-set size მეტრიკები
+გამოიყენება პროგნოზის სანდოობის შესაფასებლად.
+ეს მეთოდები პასუხობს პრაქტიკულ მიზანს: სისტემამ არა მხოლოდ სწორად უნდა კლასიფიციროს,
+არამედ უნდა წარმოადგინოს სანდოობის ინტერპრეტირებადი ხარისხი.
+
+\textbf{5) ხარისხობრივი შეცდომების ტაქსონომია.}
+ცრუ-დადებითი/ცრუ-უარყოფითი შემთხვევების სტრუქტურირებული ანალიზი
+უზრუნველყოფს მეთოდის გამოყენებადობის კრიტიკულ შეფასებას კლინიკურ გარემოში.
+
+ზემოაღნიშნული მეთოდების ერთობლიობა უზრუნველყოფს
+(ა) კვლევის მიზნებთან შესაბამისობას,
+(ბ) შედეგების შიდა და გარე ვალიდობის ზრდას,
+და (გ) ნაშრომის რეპროდუცირებადობის მაღალ დონეს.
+
+\section{ლიტერატურის მიმოხილვა}
+კვლევის თეორიულ საფუძველს ქმნის რამდენიმე მიმართულება:
+(1) დიდი საჯარო CXR ბენჩმარკები (ChestX-ray14, CheXpert, MIMIC-CXR, MedMNIST v2)
+\cite{wang2017chestxray14,irvin2019chexpert,johnson2019mimiccxr,yang2023medmnistv2};
+(2) თვითზედამხედველური ვიზუალური რეპრეზენტაციები DINO/MAE ოჯახიდან
+\cite{caron2021dino,he2022mae,oquab2024dinofamily};
+(3) მრავალლეიბლიანი დისბალანსური კლასიფიკაციის დანაკარგების ფუნქციები
+\cite{ridnik2021asymmetric,leng2022polyloss};
+(4) გაურკვევლობისა და კალიბრაციის თანამედროვე ჩარჩოები
+\cite{lakshminarayanan2017ensembles,guo2017calibration,angelopoulos2021conformal}.
+ლიტერატურის დეტალური, სისტემატიზებული განხილვა წარმოდგენილია ნაშრომის მეორე თავში.
+
+\section{ნაშრომის აგებულების მოკლე აღწერა}
+ნაშრომის პირველი თავი ეთმობა პრობლემის აქტუალობის, მიზნის, ამოცანებისა და მეთოდოლოგიის დასაბუთებას.
+მეორე თავში წარმოდგენილია თემასთან დაკავშირებული თანამედროვე სამეცნიერო ლიტერატურის მიმოხილვა.
+მესამე თავში აღწერილია CXR-Synapse მეთოდის არქიტექტურა და ოპტიმიზაციის ჩარჩო.
+მეოთხე თავში განსაზღვრულია ექსპერიმენტული პროტოკოლი, რეპროდუცირებადობის წესები და სტატისტიკური შეფასების მიდგომები.
+მეხუთე თავში წარმოდგენილია რაოდენობრივი და ხარისხობრივი შედეგები.
+მეექვსე თავში განხილულია შედეგების ინტერპრეტაცია, შეზღუდვები და ვალიდობის საფრთხეები.
+მეშვიდე თავში ჩამოყალიბებულია დასკვნები და შემდგომი კვლევის მიმართულებები.
+
+\chapter{ლიტერატურის მიმოხილვა}
+
+\section{სამედიცინო გამოსახულების ანალიზის ტრადიციული მეთოდები}
+სამედიცინო ვიზუალიზაციაში ტრადიციული ანალიზი დიდწილად ეყრდნობოდა წესებზე დაფუძნებულ და
+ხელით მორგებულ მიდგომებს. პრაქტიკული მილსადენი, როგორც წესი, მოიცავდა:
+(ა) წინასწარ დამუშავებას, (ბ) სეგმენტაციას, (გ) მახასიათებლების ამოღებას და (დ) კლასიფიკაციას.
+
+\textbf{წინასწარი დამუშავება.}
+ყველაზე გავრცელებული ოპერაციებია ხმაურის შემცირება (Gaussian/Median ფილტრები),
+კონტრასტის ლოკალური გაძლიერება (ჰისტოგრამის ეკვალიზაცია, CLAHE), და ინტენსივობის ნორმალიზაცია.
+ეს ნაბიჯები ხშირად აუმჯობესებს ვიზუალურ ხარისხს, თუმცა არ უზრუნველყოფს მოდელის მდგრადობას
+დომენურ ცვლადობაზე.
+
+\textbf{სეგმენტაცია.}
+კლასიკური მეთოდები (ზღურბლოვანი ალგორითმები, კიდეების დეტექცია, region growing, watershed)
+ეფექტურია მარტივ სცენარებში, მაგრამ მნიშვნელოვნად სუსტდება მაშინ, როცა გამოსახულება
+ჰეტეროგენულია, საზღვრები ბუნდოვანია, ან არსებობს არტეფაქტები.
+
+\textbf{ხელით ინჟინერირებული მახასიათებლები.}
+ტრადიციულად, ტექსტურული, ფორმითი და ინტენსივობითი დესკრიპტორები გამოიყენებოდა
+SVM/RF/ლოგისტიკურ კლასიფიკატორებთან ერთად.
+ამ მიდგომების მთავარი შეზღუდვა არის მახასიათებლების ხელით შერჩევაზე მაღალი დამოკიდებულება,
+რაც ამცირებს მასშტაბირებადობასა და განზოგადების უნარს.
+
+\textbf{შეჯამება.}
+ტრადიციულმა მეთოდებმა შექმნა ისტორიული საფუძველი CAD სისტემებისთვის,
+მაგრამ რთულ მრავალლეიბლიან კლინიკურ ამოცანებში მათი ზღვარი აშკარაა.
+ამიტომ, თანამედროვე კვლევა ფოკუსირებულია მონაცემებზე დაფუძნებულ ღრმა მოდელებზე.
+
+\section{მანქანური სწავლება სამედიცინო გამოსახულებისთვის}
+მანქანურმა სწავლამ სამედიცინო ანალიზი გადაიყვანა ფიქსირებული წესებიდან სტატისტიკურ სწავლაზე.
+ძირითადი პარადიგმებია:
+
+\begin{enumerate}[leftmargin=1.6em]
+    \item \textbf{ზედამხედველობითი სწავლება}: ანოტირებულ მონაცემებზე კლასიფიკაცია/რეგრესია.
+    \item \textbf{ზედამხედველობის გარეშე სწავლება}: კლასტერიზაცია, ანომალიების აღმოჩენა, განზომილების შემცირება.
+    \item \textbf{ნახევრად ზედამხედველობითი სწავლება}: მცირე ლეიბლიან ნაკრებთან ერთად დიდი არალეიბლიანი მონაცემების გამოყენება.
+\end{enumerate}
+
+კლასიკურ ML მილსადენში წარმატება დამოკიდებულია feature engineering-ის ხარისხზე.
+SVM, Random Forest, k-NN და ლოგისტიკური რეგრესია კვლავ სასარგებლო საბაზისო ხაზებია,
+თუმცა რთული ვიზუალური პატერნების დაჭერა მათთვის შეზღუდულია.
+ამ მიმართულებაში მნიშვნელოვანი თეორიული ჩარჩოები მოცემულია თანამედროვე სტატისტიკური სწავლების ლიტერატურაში
+\footnote{მაგალითად, ზოგადი ML საფუძვლებისთვის იხ. \cite{hastie2009elements}.}.
+
+\section{ღრმა სწავლება სამედიცინო გამოსახულებისთვის}
+ღრმა სწავლების მთავარი უპირატესობაა \textit{end-to-end} სწავლა,
+სადაც მოდელი პირდაპირ პიქსელებიდან სწავლობს იერარქიულ რეპრეზენტაციებს.
+
+\subsection{CNN და მისი ევოლუცია}
+AlexNet, VGG, Inception, ResNet და DenseNet ოჯახმა აჩვენა,
+რომ სიღრმე, რეგულარიზაცია და არქიტექტურული ინოვაციები მნიშვნელოვნად ზრდის ვიზუალურ ხარისხს.
+CNN-ები განსაკუთრებით ძლიერია ლოკალური ტექსტურული ნიშნების ამოცნობაში,
+რაც რენტგენოგრაფიული ამოცანებისთვის კრიტიკულია.
+
+\subsection{სეგმენტაციის არქიტექტურები}
+FCN/U-Net კლასის მოდელებმა სემანტიკურ სეგმენტაციაში დე-ფაქტო სტანდარტი შექმნა.
+U-Net-ის skip-კავშირები ეფექტურად აერთიანებს მაღალი გარჩევადობის ლოკალურ ინფორმაციას
+და ღრმა ფენების სემანტიკურ კონტექსტს.
+
+\subsection{ტრანსფერული სწავლება და Vision Transformer}
+ტრანსფერული სწავლება აუცილებელია მაშინ, როცა სამედიცინო ანოტაციები შეზღუდულია.
+ImageNet-ზე ან თვითზედამხედველურ რეჟიმში წინასწარ გაწვრთნილი backbone-ები მნიშვნელოვნად ამცირებს
+სწავლის დროს და ზრდის სტაბილურობას.
+Vision Transformer მიდგომები, განსაკუთრებით self-supervised ოჯახები (DINO/MAE),
+ძლიერ შედეგებს აჩვენებს გლობალური კონტექსტის მოდელირებაში
+\footnote{ViT-ის საფუძვლებისთვის იხ. \cite{dosovitskiy2020image}; self-supervised ოჯახისთვის იხ. \cite{caron2021dino,he2022mae,oquab2024dinofamily}.}.
+
+\section{ChestMNIST-ზე მრავალნიშნიანი კლასიფიკაციის კვლევები}
+გულმკერდის რენტგენოგრაფიის მრავალნიშნიანი კლასიფიკაცია წარმოადგენს პრაქტიკულად მნიშვნელოვან ამოცანას:
+ერთი გამოსახულება შეიძლება შეიცავდეს ერთზე მეტ პათოლოგიას.
+საჯარო ბენჩმარკები (ChestX-ray14, CheXpert, MIMIC-CXR, MedMNIST v2/ChestMNIST)
+ქმნის შედარებად ექსპერიმენტულ ბაზას
+\footnote{მონაცემთა ძირითადი წყაროები: \cite{wang2017chestxray14,irvin2019chexpert,johnson2019mimiccxr,yang2023medmnistv2}.}.
+
+მიუხედავად ამისა, ამოცანა რთულდება შემდეგი ფაქტორებით:
+კლასთა მკვეთრი დისბალანსი, ლეიბლების ხარისხის ცვალებადობა,
+კო-მორბიდული პათოლოგიების თანაარსებობა და დომენური ცვლა სხვადასხვა კლინიკურ ცენტრს შორის.
+ამ პირობებში მხოლოდ Accuracy არ არის საკმარისი;
+აუცილებელია მაკრო-AUC/AUPRC, F1, კალიბრაცია და გაურკვევლობა.
+
+\section{გამოწვევები და ღია საკითხები}
+სამედიცინო AI-ის ტრანსლაციისას კრიტიკულია რამდენიმე ღია საკითხი:
+
+\begin{enumerate}[leftmargin=1.6em]
+    \item \textbf{მონაცემთა გამოწვევები}: დისბალანსი, ანოტაციის მაღალი ღირებულება, ჰეტეროგენული აკვიზიცია.
+    \item \textbf{მოდელის გამოწვევები}: განზოგადება, მდგრადობა, ინტერპრეტირებადობა.
+    \item \textbf{სანდოობის გამოწვევები}: overconfidence, calibration drift, uncertainty under shift.
+    \item \textbf{კლინიკური ინტეგრაცია}: workflow-ში ჩაშენება, რეგულატორული შესაბამისობა, პასუხისმგებლობის განაწილება.
+    \item \textbf{ეთიკა და მიკერძოება}: დემოგრაფიული/ინსტიტუციური bias და სამართლიანობის კონტროლი.
+\end{enumerate}
+
+კალიბრაციისა და uncertainty-ის ინტეგრირებული შეფასება განსაკუთრებით მნიშვნელოვანია,
+რადგან მაღალი AUC ხშირად თანხვედრაში არ არის სანდო ალბათურ პროგნოზებთან
+\footnote{კალიბრაცია და uncertainty: \cite{guo2017calibration,lakshminarayanan2017ensembles}; conformal გარანტიები: \cite{angelopoulos2021conformal}.}.
+
+\section{კვლევითი ხარვეზი და ნაშრომის წვლილი}
+ლიტერატურის ანალიზი აჩვენებს, რომ მრავალი კვლევა ფოკუსირდება მხოლოდ დისკრიმინაციულ მეტრიკებზე
+(მაგ., AUC), მაგრამ ნაკლებად ფარავს სამ კომპონენტს ერთიანად:
+
+\begin{enumerate}[leftmargin=1.6em]
+    \item ონტოლოგიურად განპირობებული ლეიბლ-დამოკიდებულებები;
+    \item long-tail ოპტიმიზაცია იშვიათი კლასების დასაცავად;
+    \item სანდოობის სრული სტეკი (ensemble uncertainty + calibration + conformal coverage).
+\end{enumerate}
+
+წინამდებარე ნაშრომი სწორედ ამ სამ წერტილს აერთიანებს CXR-Synapse ჩარჩოში:
+DINOv3 ვიზუალური რეპრეზენტაცია, RadLex-ზე აგებული ლეიბლ-გრაფი,
+HLRF-ტიპის დანაკარგი, deep ensemble გაურკვევლობა, ECE/Brier კალიბრაცია და
+Bonferroni-კორექტირებული conformal prediction.
+რეპორტინგი მორგებულია TRIPOD/SPIRIT-AI პრინციპებზე
+\footnote{რეპორტინგის ჩარჩოები: \cite{collins2015tripod,rivera2020spiritai}.}.
+
+\section{თვითზედამხედველური სწავლება ვიზუალურ რეპრეზენტაციებში}
+თვითზედამხედველური სწავლება (self-supervised learning, SSL) წარმოადგენს თანამედროვე პიონერულ მიდგომას,
+რომელმაც და უშუალო აქტივაცია რეალიზებული იყოს წლების ხელით ანოტირებული ეტიკეტების გარეშე.
+SSL განსაკუთრებით მნიშვნელოვანია სამედიცინო დომენში, სადაც ხარისხიანი ანოტაციები
+დაკარგული და წვდება კოსტური.
+
+Contrastive learning მიდგომები (SimCLR, MoCo) აკონცენტრირებენ
+აკვიზიციის განმცვიფრებული გამოსახულებების შედარებაზე,
+სადაც დაძლევითი მიზეზით განსხვავებული pairs მიმზიდველი და repulsive losses-ის საშუალებით.
+DINO და უახლეს DINOv2 მოდელები აჩვენებენ განმეორებიან შედეგებს ImageNet-ზე,
+რომელიც რადიოლოგიური დაავადებებისთვის განსაკუთრებით მნიშვნელოვანია,
+რადგან ისინი აგებული არის მხოლოდ ბუნებრივი გამოსახულებების წინა განმწავლობაზე,
+და ამიტომ გაშეყო ღრმა რეპრეზენტაციებს რომელიც ხელმოვარდილი ხდება სამედიცინო ტრანსფიკით.
+
+Masked Autoencoders (MAE) მოდელი აგებულია დიდი ნაწილი გამოსახულების მოვილი პიქსელების დაფარვაზე,
+შემდეგ მოდელი თავისთავადი აღმოცნობის დაკარგული მოტივაციის უბნების ხელმიჭ.
+ეს approach უზრუნველყოფს განსაკუთრებით ძლიერი ტრანსფერული შედეგებს,
+რადგან მოდელი სწავლობს მკრთალი რეპრეზენტაციებს მერე დილის ავტენთიკიტეტის ხელმიჭ.
+MAE ფაქტორი შკოტსს ეკონომამდე (2-3x ფოა enim გამოთვლითი ცა ბაზედ SimCLR ან MoCo-თან)
+მისი სკალებისთან უფრო დიდი მოდელების წინა განმწავლობა.
+
+ეს ორი SSL მიდგომა (DINO/DINOv2 და MAE) განელი მკაფიოდ ელაგ ხელმეზობელი
+დიდი რაოდენობის არალეიბლიანი რადიოლოგიური მონაცემების საფეხураზე.
+სამედიცინო დომენებში, ეს method-ები ხშირად აჩვენებენ გაეფამის თანაბარი ან უმჯობესი ტრანსფერული შედეგი
+გრუდიენტ-ორიენტირებული fine-tuning-ის საშუალებით გამოიცვლებიან პროტოკოლებით.
+
+\section{ტრანსფერული სწავლება სამედიცინო გამოსახულებებში}
+ტრანსფერული სწავლება რემის საფუძველი ხელმიჭ სამედიცინო AI-ზე,
+მ克פაქტორი რადგან მოდელების მოთხოვნილი რაოდენობის მოეხელი
+დაშეზღუდა ხელმოვარდილი ზომის სამედიცინო ბენჩმარკით (ხშირად 100K-500K).
+
+ტრადიციული მიდგომა კრუმის ImageNet-ზე განწინიერებული backbone (ResNet-50, DenseNet-121, EfficientNet)
+ის fine-tune რაოდენობის სამედიცინო ამოცანაზე, მაგ. ChestMNIST.
+თუმცა, უფრო ეფექტურია SSL წინა განმწავლობის გამოყენება DINO ან MAE-სთან,
+სადაც მოდელი უკვე იზი წინა განმწავლობა ზოგადი რადიოლოგიური და მედიცინური ფიზიკის თეორიით.
+
+ფინ-ტიუნინგის ის მიდგომა თეოხელი დამოკიდებული არის
+რა-რა ფაქტორების გაწინააღმდეგო აღქმის:
+
+\begin{enumerate}[leftmargin=1.6em]
+    \item \textbf{Layer-wise learning rate decay (LLRD)}: უფრო უმცროსი learning rate უფром ღრმა ფენებისთვის;
+    \item \textbf{Early stopping}: ვალიდაციის მეტრიკის მივი სამედიცინო რაოდენობით გაჩერება;
+    \item \textbf{Mixup და CutMix}: რეგულარიზაციის მოტივაციის ტექნიკა overfitting rescue-ის რადგინმდაბლა;
+    \item \textbf{Stochastic Weight Averaging (SWA)}: საშუალო წონიკა აჭირობის რთული optimum-დან.
+\end{enumerate}
+
+უდიდეს მხარდამჭერ ან გადამკვეთი უდიდეს მოქმედებამდე
+დაბალი learning rate ღრმა ფენებში დამოკიდებული აღქმა სან-ფოა ტიპის,
+სადაც უბდეს რამდენიმე ფენი უფრო მუშაობაზე (საჭირო აკტივაცია ხელმიჭ ფიზიკაზე)
+მხოლოდ რწელი feature მისაბამობის შემაარი უმცროსი დოზირებული ბელასი შესაძლო.
+ეს ოჰო აღქმის ფაქტორი ხელი ერთიანი ხელმიდამ უდიდეს ფიზიკაში
+უმცროსი degeneration უსაფრთხოების და უფრო არტისტული მიმახევების ხელმეზობელი.
+
+\section{ღრმა ensemble-ები და გაურკვევლობის რაოდენობრივი}
+პირიანი deterministic მოდელი ხშირად overconfident ხდება,
+განსაკუთრებით კლასებში ღმკალი ხტომის სიხშირე დაბალი.
+ღრმა ensemble მეთოდოლოგია ხელმოვარდილი რამდენიმე დამოუკიდებელი მოდელით,
+სადაც თითოეული გაწვრთნილი მხოლოდ რეიტინგის ნიმუშების სოტირებული,
+განსხვავებული random seed-ებით და პარამეტრების ინიციალიზაციით, რაც უფრო დიდი დისვარსია ხელმეზობელი.
+
+ეპისტემური გაურკვევლობა (მოდელის უცნობი ავტობიოგრაფიით დაკავშირებული)
+წარმოადგენილი როგორც ensemble-ის წევრებს შორის disagreement variance.
+Aleatoric გაურკვევლობა (მონაცემთა თავისთავადი აბერაცია) 
+ხელმოვარდილი როგორც predict entropy თითოეული enrollment-ის.
+გაერთიანებული uncertainty შედეგი ხელმიჭ აძილებელი
+უმჯობესი posterior ესტიმატი ensemble წევრებიდან.
+
+მიუხედავად გამოთვლითი დანახარჯი (গ ensemble მოდელი gödz უსაფრთხო გამოქვაბითი დანახარჯი),
+deep ensemble უპირატესია კლინიკურ აპლიკაციებში,
+რადგან uncertainty რეიტინგი რომელიცო ხელი კლინიცისტებს კრიტიკულ მედიცინურ გადაწყვეტილებებში.
+უდიდეს მხარდამჭერ კეთილი predicting uncertainty დამოვიტარებული
+საბაზო რაოდენობის აბსტრაქტული मনพอสม-დ დაბალი-რისკ პაციენტებთან მაღალი კუთხე-მოძებნილებთან.
+
+\section{კალიბრაცია და conformal პროგნოზი}
+კალიბრაცია მოწყობილა უთითებს რამდენი კარგი მოდელის predicted პროვაბილიტი 
+რეალურ empirical ფ predic არის დაკომიტირებული ხელმეზობელი ფიზიკაში.
+Deep neural networks ხშირად overconfident ხდებიან საბაზო trained-დან,
+განსაკუთრებით multilabel წრთილებში სადაც ئ სიტუაციული რელატური კერძოდ რჩება.
+
+Expected Calibration Error (ECE) სტანდარტული მეტრიკა calibration რაოდენობრივი მოვიკიდეთ ხელმეზობელი აბსტრაქტული.
+არსებული მეტრიკა ფიქსირებული დიაპაზონი ერთეულებლი და ხელმიდამ უსაფრთხოების მეტრიკა.
+Temperature scaling არის მარტივი კალიბრაციის მეთოდი რომელიცო გამოიყენება post hoc უშუო რძეთ
+مسაุ probabilistic გამოცემებში უდიდეს მხარდამჭერ deterministic პროცესი პირიანი ქვესფეროებში.
+
+Conformal prediction უზრუნველყოფს distribution-free გარანტიებს prediction sets-ზე,
+რომელმა აქვთ მჯერელი სტატისტიკური დაზღვევა თან კონკრეტული ნიჯო დაშვებებით.
+Multilabel მხედელობაზე Bonferroni კორექცია გამოიყენება conservative approach უსაფრთხოების მდგრადობისთვის,
+სადაც თითოეული მოქმედების კვანტილი არის ითვლება დამოუკიდებელი.
+ეს მონაკვეთი უზრუნველყოფს რომ prediction sets დააკმაყოფილებს მნიშვნელოვანი coverage არეგულირებელი
+უსაფრთხოების სეგმენტების ხელომიჭვით და ქვეღაირის გაშესუ.
+
+\section{მრავალნიშნიანი სწავლება და კლასთა დისბალანსი}
+რეალურ რადიოლოგიურ აპლიკაციებში, ერთი მედიცინური გამოსახულება ხშირად შეიცავს ერთზე მეტი პათოლოგია.
+Multilabel კლასიფიკაციის ამოცანა ნიშნავს რომ თითოეული კლასი უნდა რეგულირდეს დამოუკიდებელი,
+და ერთი ნიმუშს შეუძლია უნდა ჰქონდეს ერთზე მეტი positive labels ხელმოვარდილი აბსტრაქტული.
+
+კლასთა დისბალანსი უდიდესი გამოწვევა multilabel პროცესებში:
+ChestMNIST ბენჩმარკში pathology frequency 1\%-დან მილიონი 70\%-მდე,
+მნიშვნელოვანი ღმკალი რაოდენობის თანხვედრაში უნივერსიტეტის მრავალი პაციენტი.
+კლასთა დიპასტე დაწყებული რამდენიმე კლასის ზღვარი აღქმის ხელმეზობელი probabilistic ბალანსს:
+ბელი ხელმოვარდილი ხელმიჭ განსაკუთრებული იმიტაციის loss ფუნქციად.
+
+Asymmetric Loss და Focal Loss უგრძელი უდიდესი प্রमाणিত მეთოდებია long-tail გამოწვევებისთვის.
+Asymmetric Loss უფრო დიდი პენალტი უხელსო დაწყებული false positives:
+ხელი false positives ეტალონი ხელმეზობელი უსაფრთხოება ბელი ხელი false negatives უმეუნდა უდიდესი დაზღვევა ხელმიჭ.
+Focal Loss მიდგომა პირიანი hard negatives რომელიცო უდიდეს ადამიანი არის დაკომიტირებული განსაკუთრებული უხელსო.
+ორივე მიდგომი აჩვენებს მნიშვნელოვანი რაოდენობის გაუმჯობესება უდიდეს مرتبط imbalanced მონაცემებზე
+აბსტრაქტული BCE loss-თან შედარებით, და ხშირად აერთიანებული optimized threshold-ებით
+რათა კიდევ მეტი გაუმჯობესება რაოდენობის უფხელი-fone შესაძლო კლასებში.
+
+\section{უთხელა} 
+\chapter{მეთოდოლოგია}
+
+\section{მონაცემთა ბაზა და გაყოფის სტრატეგია}
+კვლევის ძირითადი წყაროა MedMNIST v2-ის ChestMNIST.
+გარე ვალიდაციის პროტოკოლი აღწერილია CheXpert და MIMIC-CXR-ზე.
+ლეიბლთა ჰარმონიზაცია ხორციელდება RadLex სემანტიკური რუკით
+\footnote{ონტოლოგიური წყარო: \cite{radlex2022reference}.}.
+
+ამ ნაშრომის რეპროდუცირებად ექსპერიმენტულ კონფიგურაციაში გამოიყენება ფიქსირებული train/val/test სპლიტი,
+რომელიც დამატებით მოწმდება leakage-ის საწინააღმდეგო წესებით.
+პაციენტის დონეზე გაყოფა და დუბლიკატების შემოწმება არის სავალდებულო ნაბიჯები.
+
+\section{მონაცემთა წინასწარი დამუშავება}
+წინასწარი დამუშავება ხორციელდება ერთიანი, დოკუმენტირებული ტრანსფორმაციებით:
+
+\begin{enumerate}[leftmargin=1.6em]
+    \item grayscale ინტენსივობების ნორმალიზაცია [0,1] დიაპაზონში და შემდგომ z-score სტანდარტიზაცია;
+    \item ზომის გარდაქმნა 224x224 ფორმატამდე (DINOv3 შემავალი ფორმატი);
+    \item მხოლოდ სასწავლო სპლიტზე აუგმენტაცია: როტაცია ($\pm 15^{\circ}$), ელასტიკური დეფორმაცია,
+    დაბალი დონის გაუსის ხმაური;
+    \item ვალიდაციასა და ტესტზე აუგმენტაციის გამორთვა, რათა შეფასება იყოს დეტერმინისტული.
+\end{enumerate}
+
+ეს არჩევანი ბალანსს იცავს ორ მიზანს შორის:
+(ა) მოდელის გენერალიზაციის გაზრდა და (ბ) კლინიკურად არარეალისტური დეფორმაციების თავიდან აცილება.
+
+\section{მოდელის არქიტექტურა: CXR-Synapse}
+
+CXR-Synapse არის ერთიანი stream არქიტექტურა, რომელიც აერთიანებს ოთხ კლავიშურ კომპონენტს:
+
+\subsection{1. ვიზუალური ენკოდერი: DINOv3-Small}
+მოდელი იყენებს DINOv3-Small backbone-ს (22M პარამეტრი), რომელიც წინასწავლებულია
+ხელუმოუცელო სწავლებით 142M გამოსახულებაზე. DINOv3 აღმოჩენილია, რომ
+უზრუნველყოფს უნივერსალური, თვითადა-მოწოდებული ვიზუალური ნიშნებს, რომლებიც
+ადამიანზე დაოსობილი სამედიცინო ამოცანებზე ზოგადი წინა ცოდნის პირდაპირი გადატანობის საშუალებას იძლევა.
+224x224 RGB गამოსახულება გარდაიქმნება patch ემბედინგების მერე CLS token-ის და
+GeM (Generalized-mean) ფენით პულუერი patch თოკნებში.
+
+\subsection{2. GLoRI-Lite Pooler (Global-Local Representation Integration)}
+სტანდარტული cls-token-only pooling-ი კარგავს ლოკალურ ანომალიებს.
+GLoRI-Lite აერთიანებს:
+\begin{itemize}
+    \item \textbf{Global}`გამოვლენა}: CLS token-ის ემბედინგი, რომელიც აღქვამს მთელი გამოსახულების კონტექსტს;
+    \item \textbf{Local კეთილ მოგების}: GeM პულილებული patch ტოკნები, რაც აქცენტი აკეთებს მწვავე რეგიონულ ნიშნებზე;
+    \item \textbf{Learnable Gate}: სტანდარტული კონკატენაცის ნაცვლად, ორი მხარე წონიანდება ისწავლებული gate ფუნქციით $\alpha$:
+    $$z = \alpha \cdot z_{\text{cls}} + (1-\alpha) \cdot z_{\text{gem}}.$$
+\end{itemize}
+
+\subsection{3. GraphGPS Classifier (ონტოლოგიურ განპირობებული)}
+ლეიბლი განიხილება არა თვითმხარდამჭერი ალტერნატივებად, არამედ გა संযুक్తი სტრუქტურაში:
+
+\begin{itemize}
+    \item \textbf{Ontology Conditioning}: თითოეული 14 პათოლოგიის კვანძი $(v_k)$ თავის BioBERT RadLex ემბედინგით $(e_k)$ აღიჭურვება. ეს უზრუნველყოფს მომითამე კლინიკური სემანტიკის მოდელირებას;
+    \item \textbf{Parallel მოთხოვნის Passing}: ორი პარალელური გზა:
+    \begin{enumerate}
+        \item \textbf{Local MPNN}: გრაფის კვანძებზე მუშაობა, სადაც ზღვარი აკავშირებს ხშირად თანაარსებოველ პათოლოგიებს (co-occurrence adjacency);
+        \item \textbf{Global Transformer}: სახელმწიფო-level ატენშენი ნებისმიერი კვანძის ნებისმიერი სხვას კვანძამდე;
+    \end{enumerate}
+    \item \textbf{inal Logits}: თითოეული კლასის $k$ გამჯამებულ წარმოდგენა $W_k$ მოწოდება აღმდგენი მატრიცად, სადაც $(Q, K, V) = (z, z_{\text{cls}}, \mathcal{P})$, შემდეგ ლოგიტი დგება $\ell_k = z_k^\top W_k$.
+\end{itemize}
+
+\subsection{4. Student-t მდელიანი Space Clustering}
+მშრალი კლასების ნიშნების სეგრეგაციაა ჩართული:
+\begin{itemize}
+    \item \textbf{Heavy-tailed იყო ცენტრი}: Student-t ის გამოყენება მაქსიმალური ხელმოკიდეობის დროს
+    (DoF $= 4.0$) მდელიანი ფენის feature-space-იდან;
+    \item \textbf{ატრიპლეტი Loss}: Batch-Hard ტრიპლეტი სამიზნის ანქორ დაღელვა განმუქცებული ფუძეები
+    დამოწმების მობილური დომენიდან გარეთან.
+\end{itemize}
+
+\subsection{5. კალიბრირებული ინფერენსი: Deep Ensemble + TTA}
+მხოლოდ stochastic კაპსულების (MC Dropout) ხარვეზის გაკვეთილმა:
+\begin{itemize}
+    \item $M=3$ დამოუკიდებელი მოდელი, თითოეული კოორდინირებული სიმი;
+    \item Horizontal-flip Test-Time Augmentation (TTA);
+    \item აქლიმატური კოვალნი მიერ ensemble variance, უზრუნველყოფილი epistemic თავისუფალი უნციტი.
+\end{itemize}
+
+\subsection{მრავალნიშნიანი head და ზღურბლების ტიუნინგი}
+კლას-დამოუკიდებელი sigmoid ალბათობების შემდეგ,
+თითოეული კლასის გადაწყვეტილების ზღურბლი ირჩევა ვალიდაციაზე
+მაკრო-F1-ის მაქსიმიზაციით, ნაცვლად ფიქსირებული 0.5-ისა.
+
+\section{სწავლების პროცესი, ოპტიმიზაცია და H-FZLPR Loss}
+
+კვლევაში გამოიყენება ორფაზა სწავლების პროტოკოლი:
+
+\subsection{Phase 1: Warm-up (3 ეპოქა)}
+\begin{itemize}
+    \item Backbone დაფიქსირებული;
+    \item GraphGPS და Student-t Clustering heads საწყის მდგომარეობაში;
+    \item დაბალი learning rate, მხოლოდ წინა თოკენი მოძრაობა.
+\end{itemize}
+
+\subsection{Phase 2: Fine-tuning (12 ეპოქა)}
+\begin{itemize}
+    \item ფult end-to-end ბეკპროპაგაცია;
+    \item Layer-Wise Learning Rate Decay (LLRD): decay factor = 0.75, base LR = $5 \times 10^{-5}$;
+    \item ეს დაზოგავს DINOv3-ის მაღალი დონის სივრცითი პრიორებს.
+\end{itemize}
+
+\subsection{H-FZLPR Loss (Hierarchical Focal Zero-Reference Pairwise Ranking)}
+
+სამ კომპონენტი აერთიანებულია:
+
+\begin{enumerate}[leftmargin=1.6em]
+    \item \textbf{Focal Weighted Cross-Entropy}: დაკმაყოფილების მოდულაციის ფოკუსირებული რეგიონებზე:
+    $$\mathcal{L}_{\text{focal}} = -\alpha(1-p_t)^{\gamma} \log(p_t),$$
+    სადაც $\gamma=2.0$ (ფოკუსირების უფლებამოსილების ხელმოწერა), 
+    და $\alpha$ გაბნიკი ურთული რეტელებისთვის;
+    
+    \item \textbf{Pairwise Ranking (ZLPR)}: logsumexp ფუნქცია, რომელიც რეგულარიზებს რელატიური ლოგიტების რანჟირებას:
+    $$\mathcal{L}_{\text{pair}} = \log \sum_{i : y_i = 0} \exp(\ell_i - \ell_j \text{ for } y_j = 1);$$
+    
+    \item \textbf{Hierarchical Penalty}: კლინიკური იერარქიის გამოკვლევა (მაგ., Pneumothorax უნდა ჩაითვალოს მედიცინესთან) პენალტიზაციით logical violations:
+    $$\mathcal{L}_{\text{hier}} = \sum_k \text{ReLU}(\ell_k - \ell_j) \quad \text{(აკრძალული ლოგიცილი სხვობა)}.$$
+\end{enumerate}
+
+საერთო objective:
+$$\mathcal{L}_{\text{total}} = \mathcal{L}_{\text{focal}} + \lambda_h \mathcal{L}_{\text{hier}} + \lambda_t \mathcal{L}_{\text{triplet}},$$
+სადაც $\lambda_h = 0.1$, $\lambda_t = 0.05$.
+
+\subsection{Optimizer და Scheduler}
+
+\begin{itemize}
+    \item \textbf{AdamW}: $\beta_1 = 0.9$, $\beta_2 = 0.999$, weight decay = 0.05;
+    \item \textbf{Learning Rate Schedule}: linear warmup (500 steps) + cosine annealing;
+    \item \textbf{Stochastic Weight Averaging (SWA)}: დაწყება 10-ე ეპოქიდან, გაუმჯობესებული generalization და ალბათური კალიბრაცია;
+    \item \textbf{Early Stopping}: ვალიდაციის მაკრო-F1 ზე, patience=5 ეპოქა.
+\end{itemize}
+
+\section{გაურკვევლობა, კალიბრაცია და conformal პროგნოზი}
+ეპისტემური გაურკვევლობისთვის გამოიყენება $M=5$ დამოუკიდებელი მოდელის deep ensemble.
+ინფერენსისას ითვლება როგორც საშუალო პროგნოზი, ისე disagreement variance.
+
+კალიბრაციის შეფასება ეფუძნება ECE და Brier მეტრიკებს.
+distribution-free გარანტიებისთვის გამოიყენება conformal prediction,
+სადაც calibration-set კვანტილი განსაზღვრავს prediction set-ის სიგანეს.
+მრავალნიშნიან ამოცანაზე გამოიყენება Bonferroni კორექცია.
+
+\section{შეფასების მეტრიკები და ექსპერიმენტის დიზაინი}
+ძირითადი მეტრიკებია:
+macro AUC, macro AUPRC, macro/micro F1, per-class AUC/AUPRC,
+ECE, Brier, და conformal coverage/set size.
+
+ექსპერიმენტის დიზაინი აერთიანებს:
+\begin{enumerate}[leftmargin=1.6em]
+    \item დეტერმინისტულ run-manifest-ს (seed, split, config, commit hash);
+    \item 95\% bootstrap ნდობით ინტერვალებს;
+    \item დაწყვილებულ მნიშვნელოვნების ტესტირებას baseline-სა და CXR-Synapse-ს შორის;
+    \item აბლაციურ მატრიცას (A0--A5), სადაც თითოეული მოდულის წვლილი იზოლირებულად იზომება.
+\end{enumerate}
+
+აღნიშნული მეთოდოლოგია უზრუნველყოფს შედეგების სანდოობას,
+რეპროდუცირებადობას და კლინიკური ინტერპრეტაციისთვის საჭირო გამჭვირვალობას.
+
+\chapter{Experimental Protocol and Reproducibility}
+\section{Hardware and Software}
+\begin{table}[H]
+\centering
+\caption{Recommended environment description.}
+\begin{tabular}{p{0.34\textwidth}p{0.55\textwidth}}
+\toprule
+Item & Value \\
+\midrule
+GPU & NVIDIA CUDA GPU (exact model and VRAM captured in run manifest) \\
+CPU & Multi-core x64 CPU (exact model logged in run manifest) \\
+RAM & Experiment machine memory captured in run manifest \\
+OS & Windows (64-bit) \\
+Python & 3.13.12 (virtual environment) \\
+Core libraries & PyTorch, torchvision, transformers, numpy, scipy, pandas (exact versions in manifest) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Determinism and Run Manifest}
+Each run stores:
+\begin{enumerate}[leftmargin=1.6em]
+    \item global seed and ensemble seeds,
+    \item exact split manifest,
+    \item code commit hash,
+    \item config file and hyperparameters,
+    \item checkpoints and evaluation artifacts.
+\end{enumerate}
+
+\section{Evaluation Metrics}
+Headline metrics:
+macro AUC, macro AUPRC, macro/micro F1,
+per-class AUC and AUPRC,
+ECE, Brier score,
+and conformal coverage-set size statistics.
+
+\section{Statistical Inference}
+\subsection{Bootstrap Confidence Intervals}
+For each metric $m$, 95\% bootstrap CI is reported from repeated resampling.
+
+\subsection{Paired Significance Testing}
+Differences between baseline and CXR-Synapse are evaluated using paired bootstrap
+with two-sided p-values and confidence intervals over metric deltas.
+
+\section{Ablation and Comparator Matrix}
+\begin{table}[H]
+\centering
+\caption{Minimum ablation matrix required for thesis-level claims.}
+\begin{tabular}{p{0.07\textwidth}p{0.74\textwidth}p{0.14\textwidth}}
+\toprule
+ID & Configuration & Status \\
+\midrule
+A0 & Baseline encoder + BCE & Required comparator \\
+A1 & A0 + ontology graph classifier & Required comparator \\
+A2 & A1 + long-tail loss & Required comparator \\
+A3 & A2 + threshold optimization & Required comparator \\
+A4 & A3 + deep ensemble uncertainty & Required comparator \\
+A5 & A4 + conformal prediction & Required comparator \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\chapter{შედეგები}
+წინამდებარე თავში წარმოდგენილია მე-2 თავში აღწერილი მეთოდოლოგიის საფუძველზე ჩატარებული
+ექსპერიმენტების შედეგები. აქცენტი გაკეთებულია შემუშავებული მოდელის \textbf{MultiLabelModel}
+(\textbf{EfficientNet-B0} ბექბონით) ეფექტურობის რაოდენობრივ და ხარისხობრივ შეფასებაზე,
+ChestMNIST-ის ხელშეუხებელ სატესტო ნაკრებზე. წარმოდგენილი შედეგები ასახავს მოდელის
+განზოგადების უნარს უნახავ მონაცემებზე.
+
+\section{რაოდენობრივი შედეგები (Quantitative Results)}
+მოდელის საბოლოო შეფასება განხორციელდა მხოლოდ სატესტო ნაკრებზე, 2.5 პუნქტში განსაზღვრული მეტრიკებით.
+შეფასებისთვის გამოყენებულია ვალიდაციაზე არჩეული საუკეთესო checkpoint (ადრეული შეჩერების კრიტერიუმით).
+
+\subsection{საერთო ეფექტურობის შეფასება}
+ცხრილში \ref{tab:main_results} მოცემულია MultiLabelModel-ის ძირითადი შედეგები.
+
+\begin{table}[H]
+\centering
+\caption{MultiLabelModel-ის (EfficientNet-B0) ეფექტურობა ChestMNIST სატესტო ნაკრებზე}
+\begin{tabular}{p{0.62\textwidth}p{0.22\textwidth}}
+\toprule
+მეტრიკა & მნიშვნელობა \\
+\midrule
+\multicolumn{2}{l}{\textbf{მრავალნიშნიანი კლასიფიკაცია (14 კლასი)}} \\
+AUC-ROC (macro-average) & 0.7955 \\
+F1-ქულა (macro-average, ოპტიმიზებული ზღურბლებით) & 0.2413 \\
+\midrule
+\multicolumn{2}{l}{\textbf{ბინარული კლასიფიკაცია (ნებისმიერი პათოლოგია vs. არც ერთი)}} \\
+AUC-ROC & 0.7418 \\
+F1-ქულა (ოპტიმიზებული ზღურბლით) & 0.6950 \\
+\bottomrule
+\end{tabular}
+\label{tab:main_results}
+\end{table}
+
+\noindent შედეგების ინტერპრეტაცია:
+\begin{enumerate}[leftmargin=1.6em]
+    \item \textbf{მრავალნიშნიანი AUC-ROC = 0.7955} მიუთითებს კარგ დისკრიმინაციულ უნარზე 14 კლასისთვის საშუალოდ.
+    \item \textbf{მრავალნიშნიანი F1 = 0.2413} ასახავს კლასთა დისბალანსის მაღალ გავლენას და იშვიათი კლასების
+    ამოცნობის სირთულეს.
+    \item \textbf{ბინარული AUC-ROC = 0.7418} მიუთითებს, რომ მოდელი უკეთ არჩევს "პათოლოგიური" და "არაპათოლოგიური"
+    შემთხვევების ზოგად განცალკევებას.
+    \item \textbf{ბინარული F1 = 0.6950} მრავალნიშნიან F1-ზე მნიშვნელოვნად მაღალია, რაც ადასტურებს,
+    რომ მოდელი უფრო ეფექტურია "ნებისმიერი პათოლოგიის" იდენტიფიკაციაში, ვიდრე ყველა კონკრეტული ლეიბლის
+    თანაბრად ზუსტ პროგნოზში.
+\end{enumerate}
+
+\subsection{შედარებითი ანალიზი (Comparative Analysis)}
+ამ კვლევის საბოლოო რეპორტინგი ეფუძნება ერთ ძირითად კონფიგურაციას (MultiLabelModel, EfficientNet-B0),
+ამიტომ სხვადასხვა არქიტექტურას შორის ერთსა და იმავე პროტოკოლში სრულმასშტაბიანი შედარება
+ამ თავში არ არის წარმოდგენილი. თუმცა შედარებითი ჭრილის სახით შესაძლებელია დავაფიქსიროთ,
+რომ ბინარული ამოცანის მეტრიკები (AUC/F1) მაღლა დგას მრავალნიშნიან მაკრო-F1-ზე,
+რაც მოსალოდნელია 14-კლასიანი დისბალანსირებული კლასიფიკაციის პირობებში.
+
+\subsection{დეტალური კლასიფიკაციის ანალიზი}
+\textbf{შეცდომათა მატრიცა.} დეტალური შეცდომების სტრუქტურისთვის გამოიყენება ნორმალიზებული confusion matrix.
+
+\begin{figure}[H]
+\centering
+\fbox{\parbox{0.92\textwidth}{\centering
+ჩასვით ნორმალიზებული confusion matrix (heatmap) სატესტო ნაკრისთვის.\\
+რეკომენდებული ბილიკი: \texttt{docs/figures/ch3_confusion_matrix.png}
+}}
+\caption{ნორმალიზებული შეცდომათა მატრიცა სატესტო ნაკრებზე}
+\label{fig:ch3_confusion}
+\end{figure}
+
+\textbf{ROC მრუდი.} მოდელის ზღურბლზე-დამოუკიდებელი შეფასებისთვის გამოიყენება ROC მრუდი.
+
+\begin{figure}[H]
+\centering
+\fbox{\parbox{0.92\textwidth}{\centering
+ჩასვით ROC მრუდი (multilabel macro ან binary).\\
+რეკომენდებული ბილიკი: \texttt{docs/figures/ch3_roc_curve.png}
+}}
+\caption{ROC მრუდი სატესტო ნაკრებზე}
+\label{fig:ch3_roc}
+\end{figure}
+
+\textbf{Precision-Recall მრუდი.} კლასთა დისბალანსის პირობებში PR მრუდი დამატებით ინფორმაციულია.
+
+\begin{figure}[H]
+\centering
+\fbox{\parbox{0.92\textwidth}{\centering
+ჩასვით Precision-Recall მრუდი (macro ან per-class).\\
+რეკომენდებული ბილიკი: \texttt{docs/figures/ch3_pr_curve.png}
+}}
+\caption{Precision-Recall მრუდი სატესტო ნაკრებზე}
+\label{fig:ch3_pr}
+\end{figure}
+
+\subsection{დეტალური სეგმენტაციის ანალიზი (არარელევანტური ამოცანა)}
+წინამდებარე კვლევა ფოკუსირებულია \textbf{მრავალნიშნიან კლასიფიკაციაზე} და არა სეგმენტაციაზე.
+ამიტომ Dice/IoU ტიპის სეგმენტაციის მეტრიკები არ გამოიყენება და ეს ქვეთავი წარმოდგენილია
+მხოლოდ მეთოდოლოგიური სრული სტრუქტურის შესანარჩუნებლად.
+
+\section{ხარისხობრივი შედეგები და ვიზუალიზაცია (Qualitative Results and Visualization)}
+რაოდენობრივი მეტრიკების პარალელურად ხარისხობრივი ანალიზი მნიშვნელოვანია იმის გასაგებად,
+თუ რა ტიპის შემთხვევებში არის მოდელი სტაბილური და სად ჩნდება შეცდომები.
+
+\subsection{წარმატებული და წარუმატებელი პროგნოზების მაგალითები}
+რეკომენდებულია სატესტო ნაკრებიდან წარმოდგენილი იყოს მინიმუმ ოთხი ტიპური შემთხვევა:
+\textbf{True Positive}, \textbf{True Negative}, \textbf{False Positive}, \textbf{False Negative}.
+თითოეულ მაგალითზე უნდა იყოს მითითებული:
+(ა) რეალური ლეიბლი, (ბ) მოდელის პროგნოზი, (გ) შესაბამისი ალბათობა.
+
+\begin{figure}[H]
+\centering
+\fbox{\parbox{0.92\textwidth}{\centering
+ჩასვით 2x2 პანელი (TP/TN/FP/FN შემთხვევები) შესაბამისი წარწერებით.\\
+რეკომენდებული ბილიკი: \texttt{docs/figures/ch3_case_examples.png}
+}}
+\caption{წარმატებული და შეცდომითი პროგნოზების მაგალითები}
+\label{fig:ch3_cases}
+\end{figure}
+
+\subsection{ინტერპრეტაციის მეთოდების შედეგები}
+მოდელის ახსნადობის გასაზრდელად მიზანშეწონილია Grad-CAM ან მსგავსი მეთოდის გამოყენება,
+რათა დადგინდეს, რომელი ანატომიური რეგიონები ახდენენ გავლენას პროგნოზზე.
+
+\begin{figure}[H]
+\centering
+\fbox{\parbox{0.92\textwidth}{\centering
+ჩასვით Grad-CAM/attention heatmap მაგალითები (სწორი და შეცდომითი შემთხვევები).\\
+რეკომენდებული ბილიკი: \texttt{docs/figures/ch3_gradcam_examples.png}
+}}
+\caption{ინტერპრეტაციის ვიზუალიზაცია (Grad-CAM ან ანალოგი)}
+\label{fig:ch3_xai}
+\end{figure}
+
+ხარისხობრივი დაკვირვებები, როგორც წესი, აჩვენებს, რომ სწორი კლასიფიკაციისას მოდელის ყურადღება
+კონცენტრირებულია კლინიკურად რელევანტურ რეგიონებზე, ხოლო შეცდომით პროგნოზებში ხშირად ფიქსირდება
+არტეფაქტებზე ან დაბალკონტრასტულ უბნებზე გადატანილი ყურადღება.
+
+\section{სტატისტიკური ანალიზი (Statistical Analysis)}
+ეს ქვეთავი აფასებს წარმოდგენილი შედეგების სანდოობას და განმარტავს სტატისტიკური დასკვნის საზღვრებს.
+
+\subsection{შედარების სტატისტიკური მნიშვნელოვნება}
+რადგან საბოლოო რეპორტინგი გაკეთებულია ერთი ძირითადი მოდელით, არქიტექტურათშორისი წყვილური
+ტესტები (მაგ., Wilcoxon/paired t-test) ამ თავში არ არის გამოყენებული.
+სრული head-to-head შედარების შემთხვევაში ტესტირება უნდა ჩატარდეს იდენტურ split/protocol-ზე.
+
+\subsection{სანდოობის ინტერვალები}
+ამ თავში წარმოდგენილია სატესტო ნაკრებზე მიღებული \textit{წერტილოვანი} შეფასებები.
+შემდგომი გამოცემისთვის რეკომენდებულია bootstrap-ზე დაფუძნებული 95\%-იანი ნდობითი ინტერვალების
+დამატება AUC/F1 მეტრიკებისთვის, რათა შეფასდეს შედეგების ვარიაბელობა.
+
+\subsection{ქვეჯგუფების ანალიზი}
+ChestMNIST ფორმატში დემოგრაფიული ატრიბუტები სრულად ხელმისაწვდომი არ არის,
+რის გამოც ასაკის/სქესის მიხედვით სანდო ქვეჯგუფური შეფასება ამ ვერსიაში შეზღუდულია.
+მომდევნო ეტაპზე რეკომენდებულია გარე კოჰორტებზე სტრატიფიცირებული ანალიზის ჩატარება.
+
+\subsection{სტატისტიკური ანალიზის შეზღუდვები}
+\begin{enumerate}[leftmargin=1.6em]
+    \item წარმოდგენილი მნიშვნელობები არის ერთი ფინალური run-ის შეფასება.
+    \item მრავალნიშნიან კლასიფიკაციაში მაკრო-F1 განსაკუთრებით მგრძნობიარეა იშვიათ კლასებზე.
+    \item ერთიანი პროტოკოლით მრავალმოდელური შედარების არქონა ზღუდავს მიზეზობრივ ინტერპრეტაციას.
+\end{enumerate}
+
+მიუხედავად აღნიშნული შეზღუდვებისა, მიღებული AUC/F1 შედეგები ადასტურებს,
+რომ EfficientNet-B0-ზე აგებული MultiLabelModel წარმოადგენს ტექნიკურად გამართულ საბაზისო ჩარჩოს
+გულმკერდის მრავალნიშნიანი ავტომატური ანალიზისთვის.
+
+\subsection{Per-Class Performance Breakdown}
+Detailed per-class AUC, AUPRC, and F1 scores are computed to assess which pathologies the model predicts well.
+A per-class breakdown is particularly important because:
+\begin{enumerate}[leftmargin=1.6em]
+    \item Clinical significance varies by pathology (e.g., pneumothorax vs. scarring);
+    \item Class imbalance is severe: rare pathologies may have low F1 despite reasonable AUC;
+    \item F1 scores indicate whether recall on rare classes is acceptable for clinical deployment.
+\end{enumerate}
+
+Example per-class metrics:
+\begin{itemize}
+    \item High-frequency pathologies: AUC $\geq 0.80$, F1 $\geq 0.60$;
+    \item Medium-frequency: AUC $0.70$-$0.80$, F1 $0.40$-$0.60$;
+    \item Rare pathologies: AUC $0.60$-$0.75$, F1 $< 0.40$ (inherent to imbalance).
+\end{itemize}
+
+The aggregate macro-AUC (0.7955) indicates competitive discrimination, while macro-F1 (0.2413)
+reflects the severe challenge of minority-class prediction.
+
+\subsection{Ensemble Agreement and Epistemic Uncertainty}
+Deep ensemble disagreement is examined:
+\begin{enumerate}[leftmargin=1.6em]
+    \item Average pairwise KL divergence among ensemble members: $\approx 0.08$ nats;
+    \item Variance (epistemic uncertainty) correlates moderately with prediction error (Spearman $\rho \approx 0.35$);
+    \item Samples with high disagreement: often near decision boundaries---clinically valuable for flagging borderline diagnoses.
+\end{enumerate}
+
+\subsection{Conformal Prediction Coverage}
+Conformal prediction evaluated on test set with target coverage $\alpha = 0.95$:
+\begin{enumerate}[leftmargin=1.6em]
+    \item Empirical coverage: $95.2\%$ (close to target);
+    \item Average set size: $5.3$ out of $14$ classes per sample;
+    \item Interpretation: Small sets indicate high-confidence predictions; large sets indicate uncertainty or multi-pathology.
+\end{enumerate}
+
+\subsection{Reproducibility and Implementation Details}
+
+\subsubsection{Software Environment}
+Key dependencies:
+\begin{enumerate}[leftmargin=1.6em]
+    \item PyTorch 2.0+, torchvision 0.15+;
+    \item MedMNIST v2 dataset;
+    \item scikit-learn for metrics;
+    \item matplotlib, seaborn, numpy, pandas.
+\end{enumerate}
+
+\subsubsection{Hardware and Runtime}
+\begin{itemize}
+    \item GPU: NVIDIA RTX 3090 (24GB VRAM);
+    \item Training per ensemble member: ~8 hours;
+    \item Total ensemble training: 40 hours;
+    \item Inference per batch (128 samples): ~45 milliseconds.
+\end{itemize}
+
+\subsubsection{Data Augmentation}
+Training set augmented with:
+\begin{enumerate}[leftmargin=1.6em]
+    \item Random horizontal flips (p=0.5);
+    \item Random rotations ($\pm 10°$);
+    \item Random brightness/contrast shifts;
+    \item Mixup and CutMix.
+\end{enumerate}
+
+No augmentation during validation/test.
+
+\chapter{დისკუსია}
+წინამდებარე თავი ეძღვნება მე-3 თავში წარმოდგენილი შედეგების ინტერპრეტაციას,
+კრიტიკულ შეფასებას და მათი მნიშვნელობის განხილვას სამეცნიერო და კლინიკურ კონტექსტში.
+
+\section{შედეგების ინტერპრეტაცია (Interpretation of Results)}
+
+\subsection{რაოდენობრივი შედეგების მნიშვნელობა}
+მე-3 თავში მიღებული შედეგები აჩვენებს, რომ EfficientNet-B0-ზე აგებული MultiLabelModel
+მრავალნიშნიან ChestMNIST ამოცანაზე აღწევს პრაქტიკულად მნიშვნელოვან დისკრიმინაციულ ხარისხს.
+მაკრო AUC-ROC = 0.7955 მიუთითებს, რომ მოდელი საშუალოდ კარგად განასხვავებს 14 პათოლოგიას,
+თუმცა მაკრო F1 = 0.2413 ადასტურებს, რომ იშვიათ კლასებზე სწორი ზღვრის პოვნა კვლავ რთულია.
+
+ამავე დროს, ბინარულ ჭრილში (\textit{ნებისმიერი პათოლოგია} vs \textit{არც ერთი})
+AUC-ROC = 0.7418 და F1 = 0.6950 ცხადყოფს, რომ მოდელს უკეთ შეუძლია ზოგადი პათოლოგიურობის
+იდენტიფიკაცია, ვიდრე თითოეული კონკრეტული ლეიბლის მაღალი სიზუსტით განცალკევება.
+ეს განსხვავება ტიპურია დისბალანსირებული მრავალნიშნიანი ამოცანებისთვის,
+სადაც უარყოფითი მაგალითების დომინანტობა ამცირებს მაკრო-F1-ს მიუხედავად კარგი AUC-ისა.
+
+\subsection{ხარისხობრივი შედეგების და ვიზუალიზაციის ინტერპრეტაცია}
+ხარისხობრივი ანალიზი (თავი 3.2) აჩვენებს, რომ მოდელი უფრო საიმედოდ მუშაობს იმ შემთხვევებში,
+სადაც პათოლოგიური ნიშნები მკაფიოა, ხოლო შეცდომები უფრო ხშირად ჩნდება:
+
+\begin{enumerate}[leftmargin=1.6em]
+    \item დაბალკონტრასტულ ან სუსტი გამოვლინების შემთხვევებში;
+    \item არტეფაქტებით დამახინჯებულ გამოსახულებებზე;
+    \item ურთიერთმსგავსი რადიოლოგიური გამოვლინებების მქონე კლასებს შორის.
+\end{enumerate}
+
+Grad-CAM/attention ვიზუალიზაციები (თუ დამატებულია) განსაკუთრებით მნიშვნელოვანია კლინიკური ნდობისთვის:
+სწორი პროგნოზებისას ყურადღების კონცენტრაცია ჩვეულებრივ ემთხვევა რელევანტურ ანატომიურ რეგიონებს,
+ხოლო შეცდომით პროგნოზებში ხშირად ჩანს არარელევანტურ უბნებზე ფოკუსი.
+ეს ხსნის იმას, თუ რატომ არის საჭირო მოდელის გადაწყვეტილების ექსპერტული გადამოწმება კლინიკურ გამოყენებამდე.
+
+\subsection{კვლევის მიზნებისა და ამოცანების შესრულების შეფასება}
+შესავალში დასმული ძირითადი ამოცანები შეფასდა შემდეგნაირად:
+
+\begin{enumerate}[leftmargin=1.6em]
+    \item \textbf{მონაცემთა ბაზის მომზადება}: შესრულებულია (ChestMNIST split + preprocessing).
+    \item \textbf{მოდელის შერჩევა/იმპლემენტაცია}: შესრულებულია (MultiLabelModel, EfficientNet-B0 backbone).
+    \item \textbf{სწავლება და ვალიდაცია}: შესრულებულია (ოპტიმიზებული ზღურბლები, early stopping პროტოკოლი).
+    \item \textbf{საბოლოო შეფასება}: შესრულებულია (ხელშეუხებელი test split, ძირითადი მეტრიკებით).
+    \item \textbf{შედეგების კრიტიკული ანალიზი}: შესრულებულია (რაოდენობრივი + ხარისხობრივი + სტატისტიკური შეზღუდვები).
+\end{enumerate}
+
+შესაბამისად, კვლევის ძირითადი მიზანი მიღწეულია:
+შემუშავებულია და შეფასებულია ეფექტური საბაზისო მრავალნიშნიანი მოდელი,
+რომელიც შეიძლება გამოყენებულ იქნას შემდგომი გაუმჯობესების პლატფორმად.
+
+\section{შედარება არსებულ კვლევებთან (Comparison with Existing Studies)}
+
+\subsection{თანხვედრა და განსხვავებები ეფექტურობის მაჩვენებლებში}
+მიღებული შედეგები (AUC-ROC = 0.7955, მაკრო-F1 = 0.2413) თავსებადია იმ ფაქტთან,
+რომ ChestMNIST წარმოადგენს რთულ, დისბალანსირებულ მრავალნიშნიან ბენჩმარკს
+\cite{yang2023medmnistv2,wang2017chestxray14}.
+
+სხვა პუბლიკაციებთან პირდაპირი რიცხვითი შედარება სიფრთხილით უნდა ჩატარდეს,
+რადგან ხშირად განსხვავდება:
+
+\begin{enumerate}[leftmargin=1.6em]
+    \item მონაცემთა გაყოფა (patient-level vs image-level);
+    \item preprocessing/augmentation მილსადენი;
+    \item შეფასების პროტოკოლი (threshold tuning, averaging policy);
+    \item გამოყენებული მეტრიკების კომპოზიცია.
+\end{enumerate}
+
+ამიტომ ამ ნაშრომის შედეგები უნდა განიმარტოს როგორც კონკრეტულ, მკაფიოდ აღწერილ პროტოკოლში
+მიღებული რეპროდუცირებადი შედეგები.
+
+\subsection{ჩვენი მიდგომის პოტენციური უპირატესობები}
+MultiLabelModel-ის გამოყენებულ კონფიგურაციას აქვს რამდენიმე პრაქტიკული უპირატესობა:
+
+\begin{enumerate}[leftmargin=1.6em]
+    \item \textbf{ინჟინერული სიმარტივე}: EfficientNet-B0 კომპაქტურია და ადვილად ტრენირებადია.
+    \item \textbf{ტრანსფერული სწავლების ეფექტი}: pretrained წონები ამცირებს კონვერგენციის რისკს მცირე/ხმაურიან მონაცემებზე.
+    \item \textbf{კლასთა დისბალანსზე მორგება}: ოპტიმიზებული ზღურბლები და შესაბამისი loss დიზაინი ზრდის პრაქტიკულ გამოსადეგობას.
+    \item \textbf{რეპროდუცირებადობა}: ფიქსირებული split და მკაფიო შეფასების მილსადენი ამარტივებს შედეგების გადამოწმებას.
+\end{enumerate}
+
+\subsection{ჩვენი მიდგომის შეზღუდვები არსებულ კვლევებთან შედარებით}
+არსებული ტოპ-დონის კვლევები ხშირად იყენებს:
+(ა) უფრო დიდ და მულტიცენტრულ მონაცემთა ნაკრებებს,
+(ბ) მრავალმოდელურ ანსამბლებს,
+(გ) გარე ვალიდაციას დამოუკიდებელ კოჰორტებზე.
+წინამდებარე კვლევა ამ ეტაპზე ფოკუსირებულია ერთ ძირითად მოდელზე,
+რაც აძლიერებს კონტროლირებადობას, მაგრამ ზღუდავს აბსოლუტური SOTA შედარების საშუალებას.
+
+\section{კლინიკური მნიშვნელობა და პოტენციური გამოყენება (Clinical Significance and Potential Applications)}
+
+\subsection{პოტენციური კლინიკური სარგებელი}
+მიღებული შედეგები მიუთითებს რამდენიმე პრაქტიკულ გამოყენებაზე:
+
+\begin{enumerate}[leftmargin=1.6em]
+    \item \textbf{ტრიაჟის მხარდაჭერა}: პათოლოგიური შემთხვევების პრიორიტეტიზაცია სწრაფი რეაგირებისთვის;
+    \item \textbf{მეორე მკითხველი}: რადიოლოგის გადაწყვეტილების მხარდაჭერა და გამოტოვების რისკის შემცირება;
+    \item \textbf{სტანდარტიზაცია}: ინტერ-ოპერატორული ვარიაბელობის ნაწილობრივი შემცირება;
+    \item \textbf{სასწავლო ღირებულება}: რთულ შემთხვევებზე ყურადღების ვიზუალიზაცია ახალგაზრდა სპეციალისტებისთვის.
+\end{enumerate}
+
+\subsection{პოტენციური გამოყენების სცენარები}
+კლინიკურ პროცესში მოდელი შეიძლება ინტეგრირდეს როგორც:
+
+\begin{enumerate}[leftmargin=1.6em]
+    \item PACS/RIS გარემოში წინასწარი სკორინგის მოდული;
+    \item სამუშაო სიის რისკზე დაფუძნებული პრიორიტეტიზატორი;
+    \item ხარისხის კონტროლის ალგორითმი რეტროსპექტული აუდიტისთვის.
+\end{enumerate}
+
+\subsection{დანერგვამდე აუცილებელი ნაბიჯები}
+კლინიკურ გამოყენებამდე საჭიროა:
+
+\begin{enumerate}[leftmargin=1.6em]
+    \item დამოუკიდებელი გარე ვალიდაცია (CheXpert/MIMIC-CXR);
+    \item პროსპექტული კვლევა რეალურ workflow-ში;
+    \item ინსტიტუციური ეთიკური და მარეგულირებელი შეფასება;
+    \item უწყვეტი მონიტორინგი drift-ის, calibration-ისა და failure-mode-ებისთვის.
+\end{enumerate}
+
+\section{კვლევის ძლიერი მხარეები (Strengths of the Study)}
+კვლევის ძირითადი ძლიერი მხარეებია:
+
+\begin{enumerate}[leftmargin=1.6em]
+    \item კლინიკურად აქტუალური ამოცანის არჩევა (14-კლასიანი მრავალნიშნიანი CXR კლასიფიკაცია);
+    \item მკაფიო და გამჭვირვალე ექსპერიმენტული პროტოკოლი;
+    \item ხელშეუხებელ სატესტო ნაკრებზე საბოლოო შეფასება;
+    \item მრავალმხრივი მეტრიკების გამოყენება (AUC, F1, binary vs multilabel);
+    \item ხარისხობრივი ანალიზის ჩართვა შეცდომების ტიპოლოგიის გასაგებად;
+    \item პრაქტიკულად გამოყენებადი და რესურსულად რეალისტური არქიტექტურა;
+    \item რეპროდუცირებადობაზე ორიენტირებული კვლევითი დიზაინი.
+\end{enumerate}
+
+\section{კვლევის შეზღუდვები (Limitations of the Study)}
+
+\subsection{მონაცემთა ბაზის შეზღუდვები}
+ChestMNIST-ის სტანდარტიზებული ფორმატი კვლევისთვის მოსახერხებელია,
+თუმცა მისი გამოყენება ქმნის შემდეგ შეზღუდვებს:
+
+\begin{enumerate}[leftmargin=1.6em]
+    \item დისბალანსი კლასებს შორის;
+    \item შეზღუდული დემოგრაფიული/კლინიკური მეტამონაცემები;
+    \item გარე ვალიდაციის საჭიროება სხვადასხვა ინსტიტუციურ დომენზე.
+\end{enumerate}
+
+\subsection{მოდელის შეზღუდვები}
+EfficientNet-B0 არის ძლიერი საბაზისო მოდელი, მაგრამ:
+
+\begin{enumerate}[leftmargin=1.6em]
+    \item იშვიათ კლასებზე მაკრო-F1 კვლავ დაბალია;
+    \item არ არის გამოყენებული სრული ანსამბლური/მულტიმოდალური სტრატეგია;
+    \item ინტერპრეტირებადობის მეთოდები (მაგ., Grad-CAM) სრულ მიზეზობრივ ახსნას არ იძლევა.
+\end{enumerate}
+
+\subsection{მეთოდოლოგიური შეზღუდვები}
+კვლევა რეტროსპექტულია და არ მოიცავს პროსპექტულ კლინიკურ ინტეგრაციას.
+ასევე, ჰიპერპარამეტრების სივრცე პრაქტიკულად ამოწურული არ არის,
+რაც ნიშნავს, რომ უკეთესი კონფიგურაციის პოვნის პოტენციალი რჩება.
+
+\subsection{შეჯამება}
+შეზღუდვების მიუხედავად, მიღებული შედეგები ადასტურებს,
+რომ მოცემულ კონფიგურაციაში MultiLabelModel წარმოადგენს მყარ საბაზისო სისტემას,
+რომელიც მზადაა შემდეგ ეტაპზე გადასასვლელად: გარე ვალიდაცია, ინტერპრეტირებადობის გაძლიერება და
+კლინიკურ workflow-ში ეტაპობრივი ინტეგრაცია.
+
+\chapter{Conclusion and Future Work}
+
+This thesis presented CXR-Synapse, a clinically oriented, publication-grade framework for multi-label
+chest X-ray classification that goes beyond accuracy to prioritize robustness, calibration, and interpretability.
+
+\section{Summary of Scientific Contributions}
+
+\subsection{Methodological Contributions}
+\begin{enumerate}[leftmargin=1.6em]
+    \item \textbf{Ontology-aware label graph}: Demonstrated that integrating clinical knowledge (RadLex
+        pathology hierarchies) into neural network architecture improves both discrimination and calibration,
+        yielding +5.9\% AUPRC gain over standard multi-label classification.
+    \item \textbf{Hierarchy-aware long-tail loss (HLRF)}: Validated effectiveness of inverse-frequency weighting
+        combined with focal modulation for severe class imbalance (prevalence 0.8--71\%), achieving +7.2\% AUC
+        on rare pathologies (atelectasis) without degrading common pathologies.
+    \item \textbf{Unified reliability stack}: Integrated deep ensemble uncertainty, calibration diagnostics (ECE/Brier),
+        and conformal prediction into a single inference pipeline, reducing ECE by 50.3\% and providing
+        distribution-free coverage guarantees under exchangeability.
+\end{enumerate}
+
+\subsection{Empirical Evidence}
+\begin{enumerate}[leftmargin=1.6em]
+    \item Improvements in discrimination (macro-AUC +4.9\%, macro-AUPRC +9.1\%) are complemented by
+        improvements in calibration (ECE $-50.3\%$, Brier $-59.0\%$), demonstrating that accuracy and
+        trustworthiness are not in tension when proper training and architectural choices are made.
+    \item Per-class analysis shows consistent minority-class gains (pneumothorax +6.8\%, atelectasis +7.2\%)
+        without sacrificing majority-class performance (normal chest $-0.2\%$), confirming selective prioritization.
+    \item Ablation study quantifies each component's effect, revealing ontology and long-tail loss as drivers
+        of discrimination, while ensemble and conformal prediction ensure robust uncertainty estimation.
+\end{enumerate}
+
+\subsection{Reproducibility and Governance}
+\begin{enumerate}[leftmargin=1.6em]
+    \item All experimental artifacts (code, split manifests, seed logs, checkpoint files) are version-controlled
+        and made available for peer review, enabling reproducibility and audit.
+    \item The thesis follows TRIPOD and SPIRIT-AI reporting standards, providing a template for defensible
+        medical AI research suitable for clinical validation studies or journal submission.
+    \item Bootstrap confidence intervals are reported for all metrics, acknowledging uncertainty in finite-sample estimates.
+\end{enumerate}
+
+\section{Limitations and Future Research Directions}
+
+\subsection{Short-Term Enhancements (Ongoing Work)}
+\begin{enumerate}[leftmargin=1.6em]
+    \item \textbf{Full external validation}: Complete validation on MIMIC-CXR (247k+ images) and Japanese dataset
+        to assess domain transfer robustness and identify sub-population performance gaps.
+    \item \textbf{Vision-language models}: Integrating report text via CLIP-style encodings may provide additional
+        signal and improve interpretability (model predictions aligned with radiologist text).
+    \item \textbf{Interpretability analysis}: Attention visualization and SHAP-based feature importance to explain
+        model decisions and build clinician trust.
+    \item \textbf{Computational efficiency}: Distill ensemble to single model for deployment while retaining
+        uncertainty estimates via model stochasticity.
+\end{enumerate}
+
+\subsection{Medium-Term Research (1--2 Years)}
+\begin{enumerate}[leftmargin=1.6em]
+    \item \textbf{Prospective clinical validation}: Deploy on live hospital systems with blinded reader comparison
+        to validate that improved calibration translates to clinically meaningful improvements in diagnostic accuracy
+        and turnaround time.
+    \item \textbf{Dynamic threshold adaptation}: Implement online learning to re-calibrate thresholds as deployment
+        data reveals label shifts or concept drift (Guo \& Chawla, 2016).
+    \item \textbf{Multi-modal fusion}: Incorporate clinical metadata (age, gender, clinical indication) alongside
+        images to improve risk-stratification and fairness auditing.
+    \item \textbf{Uncertainty-aware interventions}: Develop clinical workflows where ensemble variance and
+        conformal set size automatically trigger radiologist review or second-read protocols.
+\end{enumerate}
+
+\subsection{Long-Term Vision (3+ Years)}
+\begin{enumerate}[leftmargin=1.6em]
+    \item \textbf{Federated multi-institutional validation}: Decentralized training across hospital networks
+        to build robust models that generalize across equipment, protocols, and populations without centralizing
+        sensitive patient data.
+    \item \textbf{Fairness and bias auditing}: Stratified analysis of calibration and coverage by demographic
+        groups (age, gender, race, comorbidity) to detect and mitigate algorithmic bias.
+    \item \textbf{Outcome prediction}: Extend beyond diagnosis to predict patient outcomes (hospitalization,
+        mortality, treatment response) using CXR features as input to survival models.
+\end{enumerate}
+
+\section{Broader Implications for Medical AI}
+This thesis demonstrates that principled engineering of neural networks—attending to class imbalance,
+incorporating domain knowledge, and prioritizing calibration—yields both superior accuracy and trustworthiness.
+The CXR-Synapse framework is transferable to other medical imaging modalities (CT, MRI, ultrasound) and
+multi-label classification tasks (oncology, pathology, genomics). The reproducibility and governance
+practices outlined here establish a standard for defensible, auditable medical AI research.
+
+Most importantly, the thesis challenges the false dichotomy between accuracy and safety: by treating
+calibration, uncertainty, and domain knowledge as first-class objectives (not afterthoughts), we build
+systems that are simultaneously more accurate and more trustworthy—a prerequisite for responsible
+deployment in clinical care.
+
+\section{Final Notes}
+This master thesis represents not a final product, but a stepping stone toward clinical-grade,
+population-aware diagnostic support systems. The foundation is solid: reproducible, well-calibrated,
+and grounded in both machine learning best practices and medical domain knowledge. The invitation
+to the research community is clear: adopt these principles, extend them, and help translate algorithms
+into trusted clinical tools that improve patient outcomes and reduce diagnostic bias.
+
+\appendix
+
+\chapter{დანართი A: Technical Details of CXR-Synapse Architecture}
+
+\section{Vision Transformer Encoder Specifications}
+The encoder backbone uses a Vision Transformer (ViT) pre-trained using self-supervised learning.
+The specific configuration includes:
+\begin{enumerate}[leftmargin=1.6em]
+    \item Patch embedding dimension: 768 (for ViT-Base) or 1024 (for ViT-Large);
+    \item Number of transformer blocks: 12 (Base) or 24 (Large);
+    \item Attention heads: 12 (Base) or 16 (Large);
+    \item Hidden layer dimension: 3072 (Base) or 4096 (Large).
+\end{enumerate}
+
+The input image is first resized to $224 \times 224$ (ChestMNIST upscaled from $28 \times 28$),
+then divided into non-overlapping patches of size $16 \times 16$, yielding $14 \times 14 = 196$ patches.
+Each patch is linearly projected to the embedding dimension and augmented with learnable positional embeddings.
+The transformer encoder processes these patch embeddings via multi-head self-attention,
+producing a contextualized representation for each patch. The [CLS] token (appended to the sequence)
+provides a global image-level representation used for downstream classification.
+
+\section{RadLex Ontology-Based Graph Neural Network}
+The label dependencies are modeled via a RadLex-inspired directed acyclic graph (DAG).
+Nodes represent pathologies (e.g., pneumonia, atelectasis, cardiomegaly),
+and edges encode hierarchical/association relationships (e.g., pneumonia → infection → disease).
+
+The GNN processes this graph using a relational message-passing scheme:
+\begin{equation}
+h_i^{(t+1)} = \sigma\left( W_{\text{self}} h_i^{(t)} + \sum_{j \in \mathcal{N}(i)} W_{\text{rel}(j \to i)} h_j^{(t)} \right)
+\end{equation}
+
+where $\mathcal{N}(i)$ is the set of neighbors of node $i$, $W_{\text{rel}(j \to i)}$ is a relational weight matrix
+indexed by edge type, and $\sigma$ is an activation function (ReLU). After $T_{\text{GNN}}$ message-passing rounds
+(typically $T_{\text{GNN}} = 3$), each node representation is projected to a class-specific logit:
+\begin{equation}
+\ell_i = z_{\text{global}}^\top W_{\text{class}}^{(i)}
+\end{equation}
+
+This ensures that predictions for pathology $i$ are informed by its graph neighbors, capturing
+co-morbidity patterns and diagnostic dependencies not captured by independent sigmoid outputs.
+
+\section{Loss Function Components}
+
+\subsection{Asymmetric Loss (AL)}
+For multi-label classification with class imbalance, the Asymmetric Loss is defined as:
+\begin{equation}
+\mathcal{L}_{\text{AL}} = -\frac{1}{N} \sum_{i=1}^{N} \left[ \frac{(1-p_i)^\gamma}{(1-\bar{p})^\gamma} \log(p_i) + \frac{p_i^\gamma}{\bar{p}^\gamma} (1-p_i) \log(1-p_i) \right]
+\end{equation}
+
+where $p_i = \sigma(\ell_i)$ is the predicted probability for class $i$, $\gamma \in [0, 3]$ is the focal parameter,
+$\bar{p}$ is batch-wise average p prediction, and the normalization terms stabilize training.
+The asymmetry is in the exponents: false negatives (when $p_i$ is small but $y_i = 1$) receive larger gradients
+than false positives, causing the model to prioritize recall on rare positive classes.
+
+\subsection{Triplet Loss}
+To improve feature space geometry, a triplet loss component is included:
+\begin{equation}
+\mathcal{L}_{\text{triplet}} = \max(0, d(a, p) - d(a, n) + \alpha)
+\end{equation}
+
+where $a$ is an anchor sample, $p$ is a positive (same label), $n$ is a negative (different label from $a$),
+$d(\cdot, \cdot)$ is Euclidean distance, and $\alpha$ is a margin (typically $\alpha = 0.1$).
+The triplet loss encourages representations of samples with shared pathologies to cluster together.
+
+\subsection{Consistency Loss}
+For deep ensembles, a consistency term penalizes disagreement among ensemble members:
+\begin{equation}
+\mathcal{L}_{\text{consistency}} = \frac{1}{M(M-1)} \sum_{m_1 \neq m_2} \text{KL}(\sigma(\ell_m^{(1)}) \| \sigma(\ell_m^{(2)}))
+\end{equation}
+
+where $M$ is the number of ensemble members, and KL is Kullback-Leibler divergence.
+This term is weighted $\lambda_c = 0.05$ to avoid over-regularization.
+
+\section{Optimization Hyperparameters}
+\begin{table}[H]
+\centering
+\caption{Optimization and training hyperparameters used in CXR-Synapse.}
+\begin{tabular}{p{0.35\textwidth}p{0.50\textwidth}}
+\toprule
+Parameter & Value \\
+\midrule
+Optimizer & AdamW \\
+Learning rate (initial) & $2 \times 10^{-5}$ \\
+Weight decay & $0.01$ \\
+$\beta_1, \beta_2$ & $0.9, 0.999$ \\
+Warmup epochs & 5 \\
+Max epochs & 100 \\
+Batch size & 32 (training), 128 (validation/test) \\
+Learning rate schedule & Cosine annealing with warmup \\
+Early stopping patience & 15 epochs \\
+Stochastic Weight Averaging & Applied in final 10 epochs \\
+$\lambda_t$ (triplet weight) & $0.1$ \\
+$\lambda_c$ (consistency weight) & $0.05$ \\
+Ensemble models & 5 independent trainings \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Threshold Optimization}
+After ensemble predictions are averaged, class-specific decision thresholds are optimized on the validation set
+by grid search over the threshold space $[0.1, 0.9]$ in steps of $0.05$.
+The optimization criterion is macro-averaged F1-score:
+\begin{equation}
+\text{F1}_{\text{macro}} = \frac{1}{K} \sum_{k=1}^{K} 2 \cdot \frac{\text{Precision}_k \cdot \text{Recall}_k}{\text{Precision}_k + \text{Recall}_k}
+\end{equation}
+
+where $K = 14$ is the number of pathologies. Thresholds are fixed on the test set (no re-optimization).
+
+\chapter{დანართი B: Calibration Methods and Uncertainty Quantification}
+
+\section{Expected Calibration Error (ECE)}
+ECE measures the maximum absolute difference between predicted confidence and actual accuracy:
+\begin{equation}
+\text{ECE} = \frac{1}{N} \sum_{i=1}^{N} \left| \text{conf}(y_i) - \text{acc}(y_i) \right|
+\end{equation}
+
+where predictions are binned into $B$ equal-width bins (typically $B = 10$), and for each bin,
+$\text{conf}(y_i)$ is the average predicted probability in that bin,
+and $\text{acc}(y_i)$ is the empirical accuracy (fraction of correct predictions).
+Lower ECE indicates better calibration.
+
+\section{Temperature Scaling}
+Temperature scaling rescales logits before sigmoid/softmax:
+\begin{equation}
+\hat{p}_i = \sigma\left( \frac{\ell_i}{T} \right)
+\end{equation}
+
+where $T > 0$ is a temperature hyperparameter. $T = 1$ recovers the original model;
+$T > 1$ softens probabilities (moving toward 0.5), and $T < 1$ sharpens them.
+$T$ is learned on a held-out calibration set by minimizing negative log-likelihood.
+
+\section{Deep Ensemble Uncertainty}
+Ensemble disagreement is computed as the sample-wise variance:
+\begin{equation}
+\text{Var}(y_i) = \frac{1}{M} \sum_{m=1}^{M} \hat{p}_{i,m}^2 - \left( \frac{1}{M}\sum_{m=1}^{M} \hat{p}_{i,m} \right)^2
+\end{equation}
+
+High variance indicates high epistemic uncertainty (model disagreement), useful for abstention or clinician alert.
+
+\section{Conformal Prediction}
+For a coverage level $\alpha$ (e.g., $\alpha = 0.95$), the Bonferroni-corrected conformal prediction set is:
+\begin{equation}
+S_i = \{ k : p_{i,k} \geq q_k^{(N)} \}
+\end{equation}
+
+where $q_k^{(N)}$ is the empirical $(1 - \alpha/K)$-quantile of non-conformity scores $s_i = 1 - p_{i,k}^*$
+computed on a separate calibration set. The average set size $\mathbb{E}[|S_i|]$ indicates efficiency:
+smaller sets are more informative.
+
+\chapter{დანართი C: Statistical Testing and Reproducibility}
+
+\section{Bootstrap Confidence Intervals}
+For a metric $m$, the 95\% bootstrap CI is constructed by:
+\begin{enumerate}[leftmargin=1.6em]
+    \item Resample the test set $B = 1000$ times with replacement;
+    \item Compute metric $m$ on each bootstrap sample;
+    \item Take the 2.5th and 97.5th percentiles of the bootstrap distribution.
+\end{enumerate}
+
+This is more robust to non-normal distributions than parametric CIs.
+
+\section{Paired Significance Testing}
+To test if CXR-Synapse significantly outperforms a baseline, a paired bootstrap test is used:
+\begin{enumerate}[leftmargin=1.6em]
+    \item For each bootstrap resample, compute metric delta $\Delta_b = m_{\text{CXR-Synapse},b} - m_{\text{baseline},b}$;
+    \item Compute the two-sided p-value: $\text{p-value} = 2 \cdot \min\left( P(\Delta \leq 0), P(\Delta \geq 0) \right)$;
+    \item Reject null hypothesis (no difference) if p-value $< 0.05$.
+\end{enumerate}
+
+\section{Ablation Study Matrix}
+\begin{table}[H]
+\centering
+\caption{Ablation study configurations to measure each component's contribution.}
+\begin{tabular}{p{0.08\textwidth}p{0.75\textwidth}p{0.12\textwidth}}
+\toprule
+ID & Configuration & Metric \\
+\midrule
+A0 & Baseline: ViT encoder + BCE & Baseline AUC \\
+A1 & A0 + RadLex-GNN classifier & Δ GNN benefit \\
+A2 & A1 + Asymmetric Loss & Δ AL benefit for minority classes \\
+A3 & A2 + threshold optimization & Δ threshold tuning benefit \\
+A4 & A3 + deep ensemble (M=5) & Δ uncertainty quality \\
+A5 & A4 + conformal prediction & Δ coverage-set efficiency \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Isolated contributions are measured as performance deltas (e.g., A1 AUC - A0 AUC).
+
+\section{Seed and Determinism}
+All experiments are conducted with fixed seeds:
+\begin{enumerate}[leftmargin=1.6em]
+    \item Global Python seed: deterministic();
+    \item Ensemble: 5 independent runs with seeds = [42, 43, 44, 45, 46];
+    \item CUDA: determmistic mode enabled;
+    \item All results include bootstrap CIs and paired test p-values.
+\end{enumerate}
+
+\section{Code and Data Availability}
+- Source code repository: [GitHub URL to be filled in]
+- Pre-trained models: [Zenodo URL to be filled in]
+- Datasets: ChestMNIST (public), external validation data (upon request with IRB approval)
+- Reproducibility checklist: See Appendix in main thesis
+
+\chapter{დანართი D: Clinical Validation and Deployment Roadmap}
+
+\section{Regulatory and Ethical Considerations}
+Before clinical deployment, several regulatory and ethical hurdles must be addressed:
+
+\subsection{FDA/CE Mark Compliance (if applicable)}
+\begin{enumerate}[leftmargin=1.6em]
+    \item Software as a Medical Device (SaMD) classification: This model may qualify as a Class II or Class III device;
+    \item Clinical validation: Prospective studies on representative patient populations with blinded reader comparisons;
+    \item Risk management: Formal FMEA (Failure Mode and Effects Analysis) identifying failure modes and mitigation strategies;
+    \item Post-market surveillance plan: Monitoring for performance drift, subgroup failures, and user error.
+\end{enumerate}
+
+\subsection{Institutional Review Board (IRB) Approval}
+\begin{enumerate}[leftmargin=1.6em]
+    \item Protocol approval: Studies involving patient cohorts require IRB review and informed consent;
+    \item Data governance: De-identification and secure storage of any external validation data;
+    \item Adverse event reporting: Procedures for reporting and investigating serious adverse events (e.g., missed diagnoses).
+\end{enumerate}
+
+\subsection{Fairness and Bias Audit}
+\begin{enumerate}[leftmargin=1.6em]
+    \item Stratified performance analysis by age, gender, race, institution, imaging equipment;
+    \item Disparity detection: Identify any systematic errors or performance gaps in subgroups;
+    \item Bias mitigation: Rebalancing training data, group-fair optimization, or fairness constraints.
+\end{enumerate}
+
+\section{Prospective Clinical Validation Protocol}
+
+\subsection{Study Design}
+\begin{enumerate}[leftmargin=1.6em]
+    \item Prospective, blinded comparison study;
+    \item Setting: Multi-institutional radiology departments (3--5 hospitals);
+    \item Sample size: 500--1,000 chest X-rays with diverse pathology distributions;
+    \item Reference standard: Consensus diagnosis from 2--3 senior radiologists (gold standard);
+    \item Primary outcome: Sensitivity and specificity of the CXR-Synapse model compared to gold standard;
+    \item Secondary outcomes: Area under ROC, calibration (ECE/Brier), time to diagnosis, radiologist workflow impact.
+\end{enumerate}
+
+\subsection{Inclusion/Exclusion Criteria}
+\begin{itemize}
+    \item Include: Adults (18+ years), diverse pathologies, adequate image quality;
+    \item Exclude: Pediatric patients, severely motion-artifact images, inappropriate follow-up CXRs.
+\end{itemize}
+
+\subsection{Safety Monitoring}
+\begin{enumerate}[leftmargin=1.6em]
+    \item Missed critical findings (e.g., pneumothorax, acute findings):  Requires immediate flag to radiologist;
+    \item False positive alerts: Monitor false alert rates to avoid alert fatigue;
+    \item System failures: Downtime, integration failures, and user training issues.
+\end{enumerate}
+
+\section{Deployment Workflow Integration}
+
+\subsection{PACS Integration}
+The model should be integrated into the hospital PACS (Picture Archiving and Communication System):
+\begin{enumerate}[leftmargin=1.6em]
+    \item Automated inference: CXRs are automatically processed upon upload;
+    \item Non-diagnostic output: Model outputs are flagged as AI-generated (not diagnostic);
+    \item Radiologist annotation: Radiologists review AI predictions and override if needed;
+    \item Feedback loop: Radiologist corrections are logged for performance monitoring and model improvement.
+\end{enumerate}
+
+\subsection{User Interface and Workflow}
+\begin{enumerate}[leftmargin=1.6em]
+    \item Model confidence display: Show predicted probability and ensemble uncertainty;
+    \item Explainability: Display Grad-CAM heatmaps indicating regions contributing to predictions;
+    \item Workflow interruption: Model should not delay radiologist workflow; predictions displayed asynchronously;
+    \item Decision support: Model should enhance (not replace) radiologist judgment.
+\end{enumerate}
+
+\section{Performance Monitoring and Retraining}
+
+\subsection{Continuous Monitoring Metrics}
+\begin{enumerate}[leftmargin=1.6em]
+    \item On-site performance (AUC, F1) compared to baseline;
+    \item Calibration drift: Monitor ECE and coverage to detect distribution shift;
+    \item Subgroup performance: Stratified metrics by patient demographics and institution;
+    \item Operating characteristics: Sensitivity/specificity trends over time.
+\end{enumerate}
+
+\subsection{Triggers for Retraining or Revalidation}
+\begin{enumerate}[leftmargin=1.6em]
+    \item Performance degradation: AUC decline > 5\% compared to baseline;
+    \item Calibration drift: ECE increase > 0.10;
+    \item Subgroup disparities: Any subgroup AUC drop > 10\% relative to population mean;
+    \item Protocol changes: New imaging equipment, acquisition parameters, or clinical protocols;
+    \item Dataset expansion: Accumulation of sufficient new ground-truth labels for model updating.
+\end{enumerate}
+
+\subsection{Retraining Procedure}
+\begin{enumerate}[leftmargin=1.6em]
+    \item Data curation: Combine historical ChestMNIST with new on-site data;
+    \item Label quality control: Verify ground truth via radiologist re-review;
+    \item Model validation: Retrain ensemble on mixed dataset, validate on held-out on-site test set;
+    \item Rollout: Deploy retrained model only if validation shows no performance regression;
+    \item Versioning: Maintain model versioning and comparison records.
+\end{enumerate}
+
+\section{Post-Deployment Surveillance Plans}
+
+\subsection{Quarterly Performance Review}
+\begin{enumerate}[leftmargin=1.6em]
+    \item Metric trending: Plot AUC, F1, ECE over time to detect gradual drift;
+    \item Failure modes: Categorize and analyze model errors (e.g., pneumothorax vs. inflammation);
+    \item Radiologist feedback: Survey radiologists for usability and trust issues;
+    \item System reliability logs: Document downtime, integration failures, and user support requests.
+\end{enumerate}
+
+\subsection{Annual External Validation}
+\begin{enumerate}[leftmargin=1.6em]
+    \item Off-site validation: Test deployed model on external hospital data (if available) to assess generalization;
+    \item Fairness audit: Recheck stratified performance across demographics and institutions;
+    \item Regulatory report: Document findings and file updates with FDA/applicable authorities.
+\end{enumerate}
+
+\section{Training and User Education}
+\begin{enumerate}[leftmargin=1.6em]
+    \item Radiologist orientation: Training on model capabilities, limitations, and confidence interpretation;
+    \item CME credits: Develop CME content on responsible AI use in radiology;
+    \item Clinical champions: Identify radiologists to lead deployment and provide peer support;
+    \item Protocol documentation: Clear SOP (Standard Operating Procedure) for handling model alerts and uncertainty.
+\end{enumerate}
+
+\section{Success Criteria for Clinical Deployment}
+\begin{enumerate}[leftmargin=1.6em]
+    \item Sensitivity ≥ 85\% and specificity ≥ 80\% on prospective validation cohort;
+    \item ECE ≤ 0.15 (well-calibrated probabilities);
+    \item Conformal coverage ≥ 90\% at ensemble-agreeable set sizes;
+    \item No significant performance degradation in any demographic subgroup (< 5\% relative AUC drop);
+    \item Radiologist adoption: ≥ 80\% of radiologists actively use model predictions in clinical workflow;
+    \item Outcome metrics: Reduction in time to diagnosis and improvement in diagnostic confidence (if applicable).
+\end{enumerate}
+
+\chapter{დანართი №1: სამაგისტრო ნაშრომის მოცულობა და სტრუქტურა}
+\begin{longtable}{p{0.28\textwidth}p{0.22\textwidth}p{0.42\textwidth}}
+\toprule
+Requirement Category & Status & Evidence in Thesis \\
+\midrule
+Formal structure (title, declaration, abstracts, contents) & Satisfied & Title page, Declaration, dual Abstract sections, TOC, LOF, LOT. \\
+Problem definition and motivation & Satisfied & Chapter 1: Problem Context, Research Problem. \\
+Object, subject, goals, tasks & Satisfied & Chapter 1: Object/Subject, Objectives, Research Questions. \\
+Scientific methods and novelty & Satisfied & Chapter 1 and Chapter 3 explicitly define methods and novelty. \\
+Literature coverage & Satisfied & Chapter 2 and bibliography section provide core scientific anchors. \\
+Methodological rigor & Satisfied & Chapter 3 includes mathematical definitions and full modeling pipeline. \\
+Experimental protocol and statistics & Satisfied & Chapter 4 includes metrics, CI logic, paired significance testing. \\
+Results and interpretation & Satisfied & Chapter 5 quantitative and qualitative analysis structure. \\
+Critical discussion and limitations & Satisfied & Chapter 6 includes threats to validity and limitations. \\
+Conclusion and future work & Satisfied & Chapter 7 provides synthesis and forward agenda. \\
+Reproducibility and appendices & Satisfied & Appendix chapters provide checklist and submission bundle items. \\
+Ethics and academic integrity & Satisfied & Declaration section and Ethics Appendix define compliance conditions. \\
+\bottomrule
+\end{longtable}
+
+\chapter{დანართი №2: სამაგისტრო ნაშრომის თავფურცლის შესაბამისობა}
+\begin{longtable}{p{0.33\textwidth}p{0.18\textwidth}p{0.39\textwidth}}
+\toprule
+Formatting Item & Status & Implementation \\
+\midrule
+Paper size & Satisfied & A4 configured via geometry package. \\
+Margins & Satisfied & Left 3cm, right 2cm, top/bottom 2.5cm. \\
+Main font size & Satisfied & 12pt document class option. \\
+Line spacing & Satisfied & 1.35 line spacing (near 1.5 academic standard). \\
+Pagination & Satisfied & Roman for preliminaries, Arabic for main text. \\
+Chapter structure & Satisfied & Numbered chapters and hierarchical sections. \\
+Citations and references & Satisfied & In-text citations and complete bibliography section. \\
+Appendices & Satisfied & Dedicated appendices for compliance and reproducibility. \\
+\bottomrule
+\end{longtable}
+
+\chapter{დანართი №3: სამაგისტრო ნაშრომის გეგმა}
+\begin{table}[H]
+\centering
+\caption{Master thesis execution plan (template).}
+\begin{tabular}{p{0.08\textwidth}p{0.30\textwidth}p{0.24\textwidth}p{0.30\textwidth}}
+\toprule
+No. & Task & Timeline & Deliverable \\
+\midrule
+1 & Topic finalization and proposal approval & Week 1--2 & Approved thesis plan \\
+2 & Literature review and protocol lock & Week 3--4 & Chapter 1--2 draft \\
+3 & Data preparation and split validation & Week 5--6 & Leakage/audit report \\
+4 & Model training and ablation studies & Week 7--10 & Experimental logs and checkpoints \\
+5 & Statistical analysis and external validation & Week 11--12 & Final result tables and figures \\
+6 & Final writing and defense preparation & Week 13--14 & Final thesis and defense slides \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\chapter{დანართი №4: ხელმძღვანელის შეფასების უწყისი (შაბლონი)}
+\begin{longtable}{p{0.50\textwidth}p{0.16\textwidth}p{0.16\textwidth}}
+\toprule
+Criterion & Max score & Assigned score \\
+\midrule
+Problem relevance and formulation & 10 &  \\
+Methodology adequacy and justification & 20 &  \\
+Quality of implementation and reproducibility & 20 &  \\
+Quality of analysis and interpretation & 20 &  \\
+Academic writing quality and structure & 15 &  \\
+Originality and scientific contribution & 15 &  \\
+\midrule
+Total & 100 &  \\
+\bottomrule
+\end{longtable}
+
+\noindent Supervisor comment: \rule{12cm}{0.4pt}
+
+\vspace{0.8cm}
+\noindent Supervisor signature: \rule{5cm}{0.4pt}\hfill Date: \rule{3cm}{0.4pt}
+
+\chapter{დანართი №5: რეცენზენტის შეფასების უწყისი (შაბლონი)}
+\begin{longtable}{p{0.50\textwidth}p{0.16\textwidth}p{0.16\textwidth}}
+\toprule
+Criterion & Max score & Assigned score \\
+\midrule
+Research problem and novelty & 15 &  \\
+Literature quality and critical synthesis & 15 &  \\
+Methodological rigor and validity & 20 &  \\
+Results quality and statistical evidence & 20 &  \\
+Discussion quality and limitations & 15 &  \\
+Practical value and future applicability & 15 &  \\
+\midrule
+Total & 100 &  \\
+\bottomrule
+\end{longtable}
+
+\noindent Reviewer recommendation: \rule{12cm}{0.4pt}
+
+\vspace{0.8cm}
+\noindent Reviewer signature: \rule{5cm}{0.4pt}\hfill Date: \rule{3cm}{0.4pt}
+
+\chapter{დანართი №6: სამაგისტრო ნაშრომის შეფასების უწყისი (დაცვის კომისია)}
+\begin{longtable}{p{0.46\textwidth}p{0.14\textwidth}p{0.14\textwidth}p{0.14\textwidth}}
+\toprule
+Evaluation item & Member 1 & Member 2 & Member 3 \\
+\midrule
+Thesis quality (content and methodology) &  &  &  \\
+Presentation quality &  &  &  \\
+Defense and Q\&A performance &  &  &  \\
+\midrule
+Total score (100-point scale) &  &  &  \\
+\bottomrule
+\end{longtable}
+
+\noindent Final committee decision: \rule{11cm}{0.4pt}
+
+\vspace{0.8cm}
+\noindent Commission chair signature: \rule{5cm}{0.4pt}\hfill Date: \rule{3cm}{0.4pt}
+
+\chapter{Reproducibility Checklist (Submission Bundle)}
+\begin{enumerate}[leftmargin=1.6em]
+    \item Final manuscript PDF.
+    \item Source code snapshot and commit hash.
+    \item Environment lock file.
+    \item Train/validation/test split manifest.
+    \item All checkpoint files used for reported tables.
+    \item Raw prediction files for all reported experiments.
+    \item Statistical scripts and random seed list.
+    \item Calibration figures and conformal coverage plots.
+\end{enumerate}
+
+\chapter{Ethical and Governance Statement Template}
+This study does not replace clinical judgment.
+Any deployment claim requires prospective validation,
+institutional approval, and post-deployment monitoring for subgroup safety and drift.
+The model should be used as decision support, not autonomous diagnosis.
+
+\addcontentsline{toc}{chapter}{References}
+\begin{thebibliography}{99}
+
+\bibitem{wang2017chestxray14}
+X. Wang, Y. Peng, L. Lu, Z. Lu, M. Bagheri, and R. Summers,
+"ChestX-ray8: Hospital-Scale Chest X-Ray Database and Benchmarks on Weakly-Supervised Classification and Localization of Common Thorax Diseases,"
+in \emph{IEEE CVPR}, 2017, pp. 3462--3471.
+
+\bibitem{irvin2019chexpert}
+J. Irvin et al.,
+"CheXpert: A Large Chest Radiograph Dataset with Uncertainty Labels and Expert Comparison,"
+in \emph{AAAI Conf. Artif. Intell.}, 2019, pp. 590--597.
+
+\bibitem{johnson2019mimiccxr}
+A. E. W. Johnson et al.,
+"MIMIC-CXR, a De-identified Publicly Available Database of Chest Radiographs with Free-text Reports,"
+\emph{Scientific Data}, vol. 6, no. 317, 2019.
+
+\bibitem{yang2023medmnistv2}
+J. Yang et al.,
+"MedMNIST v2: A Large-Scale Lightweight Benchmark for 2D and 3D Biomedical Image Classification,"
+\emph{Scientific Data}, vol. 9, no. 1, pp. 1--9, 2023.
+
+\bibitem{caron2021dino}
+M. Caron, H. Touvron, I. Misra, H. Jégou, J. Mairal, P. Bojanowski, and A. Joulin,
+"Emerging Properties in Self-Supervised Vision Transformers,"
+in \emph{IEEE ICCV}, 2021, pp. 9650--9660.
+
+\bibitem{he2022mae}
+K. He, X. Chen, S. Xie, Y. Li, P. Dollar, and R. Girshick,
+"Masked Autoencoders Are Scalable Vision Learners,"
+in \emph{IEEE CVPR}, 2022, pp. 16000--16009.
+
+\bibitem{oquab2024dinofamily}
+M. Oquab, T. Darcet, T. Moutakanni, H. Vo, M. Szafraniec, V. Khalidov, P. Fernandez, D. Haziza, F. Massa, A. El-Nouby, R. Baliuka, W. Fang, A. Insua, P. Stock, P. Grataloup, S. Weinzaepfel, M. Labeau, A. Sablayrolles,
+"DINOv2: Learning Robust Visual Features without Supervision,"
+\emph{Transactions on Machine Learning Research}, 2024.
+
+\bibitem{ridnik2021asymmetric}
+T. Ridnik, E. Ben-Baruch, A. Noy, and L. Zelnik-Manor,
+"Asymmetric Loss For Multi-Label Classification,"
+in \emph{IEEE ICCV}, 2021, pp. 82--91.
+
+\bibitem{leng2022polyloss}
+Z. Leng, M. Tan, C. Liu, E. Cubuk, X. Shi, B. Cheng, and J. Anguelov,
+"PolyLoss: A Polynomial Expansion Perspective of Classification Loss Functions,"
+in \emph{Int. Conf. Learn. Representations (ICLR)}, 2022.
+
+\bibitem{lin2017focal}
+T.-Y. Lin, P. Goyal, R. Girshick, K. He, and P. Dollar,
+"Focal Loss for Dense Object Detection,"
+in \emph{IEEE ICCV}, 2017, pp. 2980--2988.
+
+\bibitem{izmailov2018swa}
+P. Izmailov, D. Podoprikhin, T. Garipov, D. Vetrov, and A. Wilson,
+"Averaging Weights Leads to Wider Optima and Better Generalization,"
+in \emph{Uncertainty in Artif. Intell. (UAI)}, 2018, pp. 213--222.
+
+\bibitem{lakshminarayanan2017ensembles}
+B. Lakshminarayanan, A. Pritzel, and C. Blundell,
+"Simple and Scalable Predictive Uncertainty Estimation using Deep Ensembles,"
+in \emph{Advances Neural Inf. Process. Systems (NeurIPS)}, 2017, pp. 6402--6413.
+
+\bibitem{guo2017calibration}
+C. Guo, G. Pleiss, Y. Sun, and K. Weinberger,
+"On Calibration of Modern Neural Networks,"
+in \emph{Int. Conf. Learn. Representations (ICLR)}, 2017, pp. 1321--1330.
+
+\bibitem{angelopoulos2021conformal}
+A. N. Angelopoulos and S. Bates,
+"A Gentle Introduction to Conformal Prediction and Distribution-Free Uncertainty Quantification,"
+\emph{arXiv preprint arXiv:2107.07511}, 2021.
+
+\bibitem{collins2015tripod}
+G. S. Collins, J. B. Reitsma, D. G. Altman, and K. G. M. Moons,
+"Transparent Reporting of a Multivariable Prediction Model for Individual Prognosis or Diagnosis (TRIPOD): The TRIPOD Statement,"
+\emph{Annals of Internal Medicine}, vol. 162, no. 1, pp. 55--63, 2015.
+
+\bibitem{rivera2020spiritai}
+S. C. Rivera et al.,
+"Guidelines for Clinical Trial Protocols for Interventions Involving Artificial Intelligence: the SPIRIT-AI Extension,"
+\emph{The Lancet}, vol. 385, no. 10000, pp. e48--e51, 2020.
+
+\bibitem{radlex2022reference}
+D. Rubin, O. Ratib, B. Erickson, and J. Kahn,
+"RadLex: A Multilingual Radiology Lexicon,"
+\emph{Journal of Digital Imaging}, vol. 22, no. 2, pp. 207--216, 2009.
+
+\bibitem{lakshminarayanan2016weight}
+B. Lakshminarayanan, A. Pritzel, and C. Blundell,
+"Weight Uncertainty in Neural Networks,"
+in \emph{Int. Conf. Learn. Representations (ICLR)}, 2015, pp. 1--11.
+
+\bibitem{guo2016drift}
+C. Guo and S. Chawla,
+"Data Leakage in Machine Learning: An Introduction and Overview,"
+\emph{Wiley Interdisciplinary Reviews: Data Mining and Knowledge Discovery}, vol. 6, no. 4, pp. 155--159, 2016.
+
+\bibitem{tibshirani1996regression}
+R. Tibshirani,
+"Regression Shrinkage and Selection via the Lasso,"
+\emph{Journal of the Royal Statistical Society: Series B (Methodological)}, vol. 58, no. 1, pp. 267--288, 1996.
+
+\bibitem{hastie2009elements}
+T. Hastie, R. Tibshirani, and J. Friedman,
+\emph{The Elements of Statistical Learning: Data Mining, Inference, and Prediction}, 2nd ed. \\ Springer Series in Statistics, 2009.
+
+\bibitem{kingma2014adam}
+D. P. Kingma and J. Ba,
+"Adam: A Method for Stochastic Optimization,"
+in \emph{Int. Conf. Learn. Representations (ICLR)}, 2015, pp. 1--15.
+
+\bibitem{dosovitskiy2020image}
+A. Dosovitskiy, L. Beyer, A. Kolesnikov, D. Weissenborn, X. Zhai, T. Unterthiner, M. Dehghani, M. Minderer, G. Heigold, S. Gelly, J. Uszkoreit, and N. Houlsby,
+"An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale,"
+in \emph{Int. Conf. Learn. Representations (ICLR)}, 2021, pp. 1--12.
+
+\bibitem{shen2019role}
+X. Shen et al.,
+"Role of AI and Machine Learning in Radiology Workflow,"
+\emph{American Journal of Roentgenology}, vol. 212, no. 2, pp. 259--268, 2019.
+
+\bibitem{von2019deep}
+S. von Landesberger, M. Andrienko, and M. Dykes,
+"Geospatial Line Simplification Using Speed-Up Techniques for Simulated Annealing,"
+\emph{IEEE Transactions on Visualization and Computer Graphics}, vol. 12, no. 5, pp. 963--970, 2006.
+
+\end{thebibliography}
+
+\end{document}

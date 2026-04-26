@@ -1,0 +1,160 @@
+import time
+import math
+import sys
+import random
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch import optim
+from torch.optim.swa_utils import SWALR, AveragedModel
+from tqdm.auto import tqdm
+
+from config import log_process, DEVICE
+from utils import ensure_radlex_embeddings, compute_logit_adjustment, RADLEX_PATHOLOGIES, EarlyStopping
+from model import CXR_Synapse_Foundation, LogitAdjustedAsymmetricEvidentialLoss, target_distribution, batch_hard_triplet_loss
+from evaluators import validate
+import logging
+
+CFG = {
+    "num_epochs": 35,
+    "swa_start": 25,
+    "batch_size": 64,
+    "base_lr": 2e-4,
+    "weight_decay": 0.05,
+    "warmup_steps": 200,
+    "trip_lambda": 0.05,
+    "trip_margin": 0.3,
+    "cluster_lambda": 0.10,
+    "patience": 10,
+    "max_grad_norm": 1.0,
+    "nan_abort_ratio": 0.3,
+}
+
+ENSEMBLE_CKPT_TMPL = "CXR_Synapse_Foundation_Seed_{seed}.pth"
+
+def train_single_model(seed, adj_norm_np, train_emb_dataset, train_loader, val_loader, num_workers):
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    ckpt_path = ENSEMBLE_CKPT_TMPL.format(seed=seed)
+    log_process("train", "seed_started", seed=seed, checkpoint=ckpt_path)
+    
+    model = CXR_Synapse_Foundation(num_classes=14).to(DEVICE)
+    model.set_adjacency_mask(adj_norm_np)
+    radlex = ensure_radlex_embeddings(path="radlex_embeddings_14.pth", pathologies=RADLEX_PATHOLOGIES, model_name="microsoft/BiomedVLP-BioViL-T", device_=DEVICE)
+    model.set_radlex_embeddings(radlex.detach())
+
+    _train_labels_np = train_emb_dataset.labels.numpy().astype(np.int32)
+    logit_adj_vec = compute_logit_adjustment(_train_labels_np, tau=1.0).to(DEVICE)
+    
+    loss_fn = LogitAdjustedAsymmetricEvidentialLoss(
+        logit_adj=logit_adj_vec,
+        gamma_pos=0.0,
+        gamma_neg=4.0,
+        clip=0.05,
+        annealing_epochs=15,
+    ).to(DEVICE)
+    
+    optimizer = torch.optim.AdamW(model.parameters(), lr=CFG["base_lr"], weight_decay=CFG["weight_decay"])
+    
+    total_steps = CFG["num_epochs"] * len(train_loader)
+    warmup_steps = CFG["warmup_steps"]
+    def _lr_lambda(step):
+        if step < warmup_steps: return step / max(warmup_steps, 1)
+        prog = (step - warmup_steps) / max(total_steps - warmup_steps, 1)
+        return 0.5 * (1 + math.cos(math.pi * prog))
+
+    scheduler = optim.lr_scheduler.LambdaLR(optimizer, _lr_lambda)
+    scaler = torch.cuda.amp.GradScaler(enabled=(DEVICE.type == "cuda"))
+    swa_model = AveragedModel(model)
+    swa_scheduler = SWALR(optimizer, swa_lr=5e-5, anneal_epochs=3)
+    early = EarlyStopping(patience=CFG["patience"], path=ckpt_path)
+    t0 = time.time()
+    consec_nan = 0
+    
+    for epoch in range(1, CFG["num_epochs"] + 1):
+        kl_w = CFG["cluster_lambda"] if epoch > 5 else 0.0
+        model.train()
+        run_loss = nan_steps = valid_steps = 0
+        total_b = len(train_loader)
+        pbar = tqdm(train_loader, desc=f"  Ep {epoch:>2}/{CFG['num_epochs']}", leave=False)
+        for feats, lbls in pbar:
+            feats, lbls = feats.to(DEVICE), lbls.to(DEVICE).float()
+            optimizer.zero_grad(set_to_none=True)
+            with torch.cuda.amp.autocast(enabled=(DEVICE.type == "cuda")):
+                feat_logit, fused, q = model(feats)
+                total_clf_loss = loss_fn(feat_logit.float(), lbls.float(), epoch)
+                p_lbl = torch.argmax(q, 1)
+                p_dist = target_distribution(q.detach())
+                kl_loss = F.kl_div((q + 1e-12).log(), p_dist, reduction="batchmean")
+                trip = batch_hard_triplet_loss(fused, p_lbl, CFG["trip_margin"])
+                loss = total_clf_loss + CFG["trip_lambda"] * trip + kl_w * kl_loss
+            
+            if not torch.isfinite(loss):
+                nan_steps += 1
+                if nan_steps > total_b * CFG["nan_abort_ratio"]:
+                    print(f"  [!] NaN ratio {nan_steps}/{total_b} — aborting epoch.")
+                    log_process("train", "epoch_aborted_nan_ratio", level=logging.WARNING, seed=seed, epoch=epoch, nan_steps=nan_steps, total_steps=total_b)
+                    break
+                continue
+
+            scaler.scale(loss).backward()
+            scaler.unscale_(optimizer)
+            gn = nn.utils.clip_grad_norm_(model.parameters(), CFG["max_grad_norm"])
+            if torch.isfinite(gn):
+                scaler.step(optimizer)
+            else:
+                nan_steps += 1
+            scaler.update()
+            
+            if epoch < CFG["swa_start"]: scheduler.step()
+            run_loss += loss.item()
+            valid_steps += 1
+            pbar.set_postfix({"loss": f"{loss.item():.4f}", "clf": f"{total_clf_loss.item():.4f}"})
+
+        nan_ratio = nan_steps / max(total_b, 1)
+        if nan_ratio > CFG["nan_abort_ratio"]:
+            consec_nan += 1
+            for pg in optimizer.param_groups: pg["lr"] *= 0.5
+            print(f"  [!] LR halved (consecutive NaN epochs: {consec_nan}).")
+            log_process("train", "lr_halved_due_to_nan", level=logging.WARNING, seed=seed, epoch=epoch, consecutive_nan_epochs=consec_nan)
+            if consec_nan >= 3:
+                print(f"  [✗] Aborting seed {seed} after 3 NaN epochs.")
+                log_process("train", "seed_aborted_nan", level=logging.ERROR, seed=seed, epoch=epoch, consecutive_nan_epochs=consec_nan)
+                break
+        else:
+            consec_nan = 0
+
+        if epoch >= CFG["swa_start"]:
+            swa_model.update_parameters(model)
+            swa_scheduler.step()
+        
+        avg_l = run_loss / max(valid_steps, 1)
+        eval_m = swa_model if epoch >= CFG["swa_start"] else model
+        v_auc, v_f1, _, _, _ = validate(eval_m, val_loader, DEVICE)
+        saved = early(v_auc, eval_m)
+        
+        swa_t = "[SWA]" if epoch >= CFG["swa_start"] else "     "
+        tag = " ✓" if saved else ""
+        print(f"  {swa_t} Ep {epoch:>2} | Loss {avg_l:.4f} | AUC {v_auc:.4f} | F1@0.5(info) {v_f1:.4f}{tag}")
+        log_process("train", "epoch_completed", seed=seed, epoch=epoch, loss=f"{avg_l:.4f}", val_auc=f"{v_auc:.4f}", val_f1_at_05=f"{v_f1:.4f}", best_saved=saved, swa=(epoch >= CFG["swa_start"]))
+
+        if early.early_stop:
+            print(f"  [!] Early stopping at epoch {epoch}.")
+            log_process("train", "early_stopping_triggered", level=logging.WARNING, seed=seed, epoch=epoch, best_auc=f"{early.best_score:.4f}")
+            break
+            
+    elapsed = time.time() - t0
+    print(f"  ✓ Seed {seed} done ({elapsed//60:.0f}m {elapsed%60:.0f}s) | Best AUC: {early.best_score:.4f} → {ckpt_path}")
+    log_process("train", "seed_completed", seed=seed, elapsed_min=f"{elapsed/60:.2f}", best_auc=f"{early.best_score:.4f}", checkpoint=ckpt_path)
+    return ckpt_path
+
+def train_ensemble(seeds, adj_norm_np, train_emb_dataset, train_loader, val_loader, num_workers):
+    ensemble_checkpoints = []
+    log_process("train", "ensemble_training_started", members=len(seeds), epochs=CFG["num_epochs"])
+    for _i, _seed in enumerate(seeds):
+        log_process("train", "ensemble_member_started", index=_i + 1, total=len(seeds), seed=_seed)
+        ckpt = train_single_model(_seed, adj_norm_np, train_emb_dataset, train_loader, val_loader, num_workers)
+        ensemble_checkpoints.append(ckpt)
+    return ensemble_checkpoints
