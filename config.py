@@ -1,13 +1,13 @@
-import logging
-import os
-import sys
 import datetime
 import hashlib
-import random
-import platform
+import logging
 import numpy as np
-import torch
+import os
 import pandas as pd
+import platform
+import random
+import sys
+import torch
 
 # ============================================================
 # EXPERIMENT PROVENANCE & IDENTIFICATION
@@ -23,6 +23,7 @@ EXPERIMENT_ID = hashlib.sha256(
     f"{EXPERIMENT_NAME}_{GLOBAL_SEED}_{datetime.datetime.now(datetime.timezone.utc).isoformat()}".encode()
 ).hexdigest()[:12]
 
+
 # ============================================================
 # OBSERVABILITY & STRUCTURED LOGGING
 # ============================================================
@@ -33,7 +34,7 @@ def _configure_logger(name="cxr_synapse", level=None):
     Ensures observability across distributed training and evaluation passes.
     """
     logger = logging.getLogger(name)
-    
+
     # Allow log level override via environment variable for debugging flexibility
     level_name = (level or os.getenv("CXR_LOG_LEVEL", "INFO")).upper()
     level_value = getattr(logging, level_name, logging.INFO)
@@ -47,10 +48,10 @@ def _configure_logger(name="cxr_synapse", level=None):
 
     logger.setLevel(level_value)
     logger.propagate = False
-    
+
     handler = logging.StreamHandler(sys.stdout)
     handler.setLevel(level_value)
-    
+
     # Format: 2026-04-26 19:00:00 | LEVEL | Message
     handler.setFormatter(
         logging.Formatter(
@@ -60,7 +61,9 @@ def _configure_logger(name="cxr_synapse", level=None):
     logger.addHandler(handler)
     return logger
 
+
 LOGGER = _configure_logger()
+
 
 def log_process(stage, event, level=logging.INFO, **details):
     """
@@ -78,6 +81,7 @@ def log_process(stage, event, level=logging.INFO, **details):
         LOGGER.log(level, "[%s] %s | %s", stage, event, detail_str)
     else:
         LOGGER.log(level, "[%s] %s", stage, event)
+
 
 # ============================================================
 # SCIENTIFIC DETERMINISM PROTOCOL
@@ -97,32 +101,33 @@ def enforce_reproducibility(seed: int = GLOBAL_SEED) -> torch.Generator:
     6. Deterministic Linear Algebra (CUBLAS)
     """
     os.environ["PYTHONHASHSEED"] = str(seed)
-    
+
     # Force deterministic algorithms for CUDA BLAS operations
     # Requirement: torch >= 1.8.0
     os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
-    
+
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
-    
+
     # Disable cuDNN auto-tuner to prevent non-deterministic algorithm selection
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
-    
+
     # Throw error if a non-deterministic operation is encountered (strict mode)
     torch.use_deterministic_algorithms(True, warn_only=True)
-    
+
     # Set matrix multiplication precision to highest for Float32 (Tensor Cores)
     if hasattr(torch, "set_float32_matmul_precision"):
         torch.set_float32_matmul_precision("highest")
-        
+
     # Generate a unique Generator for DataLoaders to ensure worker-level determinism
     g = torch.Generator()
     g.manual_seed(seed)
     return g
+
 
 # Initialize Global Dataloader Generator
 DATALOADER_GENERATOR = enforce_reproducibility(GLOBAL_SEED)

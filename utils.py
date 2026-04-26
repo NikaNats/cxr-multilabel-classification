@@ -1,12 +1,12 @@
-import os
-import warnings
 import numpy as np
+import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import warnings
 from scipy.ndimage import uniform_filter1d
-from sklearn.metrics import f1_score, roc_auc_score, average_precision_score, brier_score_loss
 from sklearn.exceptions import UndefinedMetricWarning
+from sklearn.metrics import f1_score, roc_auc_score, average_precision_score, brier_score_loss
 
 from config import log_process
 
@@ -18,16 +18,17 @@ warnings.filterwarnings("ignore", category=UndefinedMetricWarning)
 # CLINICAL ONTOLOGY CONFIGURATION
 # ============================================================
 CHESTMNIST_CLASS_NAMES = [
-    "Atelectasis", "Cardiomegaly", "Effusion", "Infiltration", "Mass", 
-    "Nodule", "Pneumonia", "Pneumothorax", "Consolidation", "Edema", 
+    "Atelectasis", "Cardiomegaly", "Effusion", "Infiltration", "Mass",
+    "Nodule", "Pneumonia", "Pneumothorax", "Consolidation", "Edema",
     "Emphysema", "Fibrosis", "Pleural_Thickening", "Hernia"
 ]
 
 RADLEX_PATHOLOGIES = [
-    "Atelectasis", "Cardiomegaly", "Effusion", "Infiltration", "Mass", 
-    "Nodule", "Pneumonia", "Pneumothorax", "Consolidation", "Edema", 
+    "Atelectasis", "Cardiomegaly", "Effusion", "Infiltration", "Mass",
+    "Nodule", "Pneumonia", "Pneumothorax", "Consolidation", "Edema",
     "Emphysema", "Fibrosis", "Pleural Thickening", "Hernia"
 ]
+
 
 # ============================================================
 # SCIENTIFIC VISUALIZATION
@@ -47,6 +48,7 @@ def configure_nature_plots():
         "savefig.dpi": 600, "figure.facecolor": "white", "savefig.bbox": "tight",
     })
 
+
 # ============================================================
 # CLINICAL KNOWLEDGE INJECTION (BioViL-T)
 # ============================================================
@@ -59,8 +61,8 @@ def ensure_radlex_embeddings(path, pathologies, model_name, device_):
     to drive the GraphGPS-based label conditioning.
     """
     from transformers import AutoModel, AutoTokenizer
-    target_dim = 768 
-    
+    target_dim = 768
+
     if os.path.exists(path):
         try:
             emb = torch.load(path, map_location=device_, weights_only=True)
@@ -90,6 +92,7 @@ def ensure_radlex_embeddings(path, pathologies, model_name, device_):
     torch.save(final_res, path)
     return final_res.to(device_)
 
+
 # ============================================================
 # KNOWLEDGE GRAPH TOPOLOGY
 # ============================================================
@@ -107,21 +110,22 @@ def select_adjacency_threshold(labels: np.ndarray, num_classes: int = 14) -> flo
         for i in idx:
             for j in idx:
                 co[i, j] += 1.0
-                
+
     co_sym = (co + co.T) / 2.0
     prob = co_sym / np.maximum(co_sym.sum(1, keepdims=True), 1.0)
-    
+
     thresholds = np.linspace(0.01, 0.95, 200)
     densities = [(prob >= t).mean() for t in thresholds]
     densities_smooth = uniform_filter1d(densities, size=7)
-    
+
     # Calculate second derivative to find the 'knee' of the curve
     d2 = np.gradient(np.gradient(densities_smooth))
     knee_idx = int(np.argmax(np.abs(d2)))
     optimal_t = float(np.clip(thresholds[knee_idx], 0.05, 0.40))
-    
+
     log_process("graph", "adjacency_threshold_selected", clamped=f"{optimal_t:.3f}")
     return optimal_t
+
 
 def build_cooccurrence_adjacency(labels, num_classes=14, threshold=0.4, self_loops=True):
     """
@@ -137,19 +141,20 @@ def build_cooccurrence_adjacency(labels, num_classes=14, threshold=0.4, self_loo
         for i in idx:
             for j in idx:
                 co[i, j] += 1.0
-    
+
     co_sym = (co + co.T) / 2.0
     prob = co_sym / np.maximum(co_sym.sum(1, keepdims=True), 1.0)
-    
+
     adj = (prob >= threshold).astype(np.float64) * prob
-    if self_loops: 
+    if self_loops:
         adj += np.eye(num_classes)
-        
+
     deg = adj.sum(1)
     # D^-1/2 calculation for GCN normalization
     d_inv_sq = np.where(deg > 0, np.power(np.maximum(deg, 1e-12), -0.5), 0.0)
     d_inv_sq = np.diag(d_inv_sq)
     return (d_inv_sq @ adj @ d_inv_sq).astype(np.float32)
+
 
 # ============================================================
 # LONG-TAIL LOGIT ADJUSTMENT
@@ -162,9 +167,10 @@ def compute_logit_adjustment(train_labels_np, tau=1.0):
     Crucial for rare pathologies (like Hernia) which are 1000x less frequent than Effusion.
     """
     pos_freq = np.mean(train_labels_np, axis=0)
-    pos_freq = np.clip(pos_freq, 1e-5, 1.0 - 1e-5) # Prevent log(0) singularity
+    pos_freq = np.clip(pos_freq, 1e-5, 1.0 - 1e-5)  # Prevent log(0) singularity
     adjustment = tau * np.log(pos_freq / (1.0 - pos_freq))
     return torch.from_numpy(adjustment.astype(np.float32))
+
 
 # ============================================================
 # PROBABILISTIC CALIBRATION (Guo et al., ICML 2017)
@@ -175,10 +181,11 @@ class TemperatureScaler(nn.Module):
     Specifically modified to clamp T in [0.1, 3.5] to prevent 
     evidential logit exploding syndrome observed in EDL models.
     """
+
     def __init__(self, model):
         super().__init__()
         self.model = model
-        self.temperature = nn.Parameter(torch.ones(1) * 1.5) 
+        self.temperature = nn.Parameter(torch.ones(1) * 1.5)
 
     def forward(self, x):
         logits = self.base_model_call(x)
@@ -193,25 +200,27 @@ class TemperatureScaler(nn.Module):
         with torch.no_grad():
             for feats, lbls in val_loader:
                 logits = self.base_model_call(feats.to(device_))
-                all_logits.append(logits.cpu()); all_labels.append(lbls)
-                
+                all_logits.append(logits.cpu());
+                all_labels.append(lbls)
+
         logits_val = torch.cat(all_logits).to(device_)
         labels_val = torch.cat(all_labels).float().to(device_)
         optimizer = torch.optim.LBFGS([self.temperature], lr=0.01, max_iter=max_iter)
-        
+
         def _eval():
             optimizer.zero_grad()
             t_clamp = self.temperature.clamp(min=0.1, max=3.5)
             loss = F.binary_cross_entropy_with_logits(logits_val / t_clamp, labels_val)
             loss.backward()
             return loss
-            
+
         optimizer.step(_eval)
         return self.temperature.clamp(min=0.1, max=3.5).item()
 
     def base_model_call(self, x):
         out = self.model(x)
         return out[0] if isinstance(out, tuple) else out
+
 
 def expected_calibration_error(probs, labels, n_bins=15):
     """
@@ -224,12 +233,13 @@ def expected_calibration_error(probs, labels, n_bins=15):
         bounds = np.linspace(0, 1, n_bins + 1)
         ek = 0.0
         for b_idx in range(n_bins):
-            lo, hi = bounds[b_idx], bounds[b_idx+1]
+            lo, hi = bounds[b_idx], bounds[b_idx + 1]
             m = (probs[:, k] >= lo) & (probs[:, k] < hi)
-            if m.sum() > 0: 
+            if m.sum() > 0:
                 ek += m.mean() * abs(labels[m, k].mean() - probs[m, k].mean())
         ece.append(ek)
     return np.array(ece)
+
 
 # ============================================================
 # MULTI-LABEL CONFORMAL PREDICTION (Safety Wrapper)
@@ -242,6 +252,7 @@ class MultiLabelConformalPredictor:
     Guarantees that each pathology's true state is included in the diagnostic set 
     with probability >= 1-alpha (90% by default). Essential for legal/clinical safety.
     """
+
     def __init__(self, alpha=0.10):
         self.alpha = alpha
         self.thresholds = None
@@ -266,6 +277,7 @@ class MultiLabelConformalPredictor:
         """Constructs the Conformal Set based on calibrated error rates."""
         return {"include_pos": probs >= self.thresholds}
 
+
 # ============================================================
 # STATISTICAL VALIDATION (Bootstrapping)
 # ============================================================
@@ -278,10 +290,13 @@ def bootstrap_metric_ci(fn, y_true, y_score, n=2000, alpha=0.05, seed=42):
         try:
             v = float(fn(y_true[idx], y_score[idx]))
             if np.isfinite(v): vals.append(v)
-        except Exception: pass
+        except Exception:
+            pass
     if not vals: return dict(mean=np.nan, ci_low=np.nan, ci_high=np.nan)
     a = np.array(vals)
-    return dict(mean=float(a.mean()), ci_low=float(np.quantile(a, alpha/2)), ci_high=float(np.quantile(a, 1-alpha/2)))
+    return dict(mean=float(a.mean()), ci_low=float(np.quantile(a, alpha / 2)),
+                ci_high=float(np.quantile(a, 1 - alpha / 2)))
+
 
 def paired_bootstrap_metric_test(fn, y_true, ya, yb, n=2000, seed=42):
     """Calculates paired p-value to prove model superiority."""
@@ -292,17 +307,19 @@ def paired_bootstrap_metric_test(fn, y_true, ya, yb, n=2000, seed=42):
         try:
             da, db = float(fn(y_true[idx], ya[idx])), float(fn(y_true[idx], yb[idx]))
             diffs.append(da - db)
-        except Exception: pass
+        except Exception:
+            pass
     a = np.array(diffs)
     # Two-sided paired p-value
     p_val = float(min(1.0, 2 * min(np.mean(a <= 0), np.mean(a >= 0))))
     return dict(delta=float(a.mean()), p_value=p_val)
 
+
 def optimise_thresholds(probs, labels, grid_steps=150):
     """Searches for F1-maximizing thresholds in imbalanced medical data."""
     n_cls = probs.shape[1]
     thr = np.full(n_cls, 0.5)
-    grid = np.linspace(0.005, 0.50, grid_steps) # Focused on low prevalence
+    grid = np.linspace(0.005, 0.50, grid_steps)  # Focused on low prevalence
     for k in range(n_cls):
         best_f1 = 0.0
         if labels[:, k].sum() == 0: continue
@@ -311,8 +328,10 @@ def optimise_thresholds(probs, labels, grid_steps=150):
             if f > best_f1: best_f1, thr[k] = f, t
     return thr
 
+
 class EarlyStopping:
     """Monitors Validation AUC to prevent over-fitting on small datasets."""
+
     def __init__(self, patience=10, delta=0.001, path="best.pth"):
         self.patience, self.delta, self.path = patience, delta, path
         self.best_score, self.counter, self.early_stop = -np.inf, 0, False

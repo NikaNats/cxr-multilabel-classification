@@ -1,13 +1,14 @@
-import os
 import hashlib
+import logging
 import multiprocessing
 import numpy as np
+import os
 import torch
-import logging
-from torchvision import transforms
-from torch.utils.data import DataLoader, Dataset
 from medmnist import ChestMNIST
-from config import GLOBAL_SEED, DATALOADER_GENERATOR, log_process
+from torch.utils.data import DataLoader, Dataset
+from torchvision import transforms
+
+from config import DATALOADER_GENERATOR, log_process
 
 # ============================================================
 # GLOBAL DATA CONFIGURATION
@@ -27,12 +28,14 @@ _extract_transform = transforms.Compose(
     ]
 )
 
+
 def _img_hashes(arr: np.ndarray) -> list:
     """
     Generates bit-exact MD5 fingerprints for raw pixel data.
     Used for the Forensic Leakage Audit to detect identical scans across splits.
     """
     return [hashlib.md5(arr[i].tobytes()).hexdigest() for i in range(len(arr))]
+
 
 def get_raw_datasets():
     """
@@ -72,18 +75,19 @@ def get_raw_datasets():
         test_dataset_raw.labels = test_dataset_raw.labels[test_keep]
         test_dataset_raw.info["n_samples"]["test"] = int(test_keep.sum())
         print(f"  Removed {n_test_rm} duplicate(s) from Test.")
-    
+
     class_names = [train_dataset_raw.info["label"][str(i)] for i in range(len(train_dataset_raw.info["label"]))]
-    
-    log_process("data", "dataset_ready", 
-                train=len(train_dataset_raw), 
-                val=len(val_dataset_raw), 
-                test=len(test_dataset_raw), 
-                classes=len(class_names), 
-                val_dups_removed=n_val_rm, 
+
+    log_process("data", "dataset_ready",
+                train=len(train_dataset_raw),
+                val=len(val_dataset_raw),
+                test=len(test_dataset_raw),
+                classes=len(class_names),
+                val_dups_removed=n_val_rm,
                 test_dups_removed=n_test_rm)
-    
+
     return train_dataset_raw, val_dataset_raw, test_dataset_raw, class_names
+
 
 class EmbeddingDataset(Dataset):
     """
@@ -91,33 +95,37 @@ class EmbeddingDataset(Dataset):
     Loads pre-computed 1376-dimensional feature maps (8x8 spatial resolution)
     to bypass the ELIXR-C inference overhead during training.
     """
+
     def __init__(self, path: str):
         if not os.path.exists(path):
             raise FileNotFoundError(f"Embedding file not found: {path}\nPlease run extraction first.")
-        
+
         # Safe-load protocol using weights_only=True to prevent arbitrary code execution
         data = torch.load(path, map_location="cpu", weights_only=True)
         self.features = data["features"].float()
         self.labels = data["labels"].float()
-        
+
         # Structural Integrity Check: Ensure feature/label alignment
         n_f, n_l = self.features.shape[0], self.labels.shape[0]
         if n_f != n_l:
             _min = min(n_f, n_l)
             print(f"  [!] Size mismatch in {path}: features({n_f}) ≠ labels({n_l}). Truncating to {_min}.")
-            log_process("data", "embedding_size_mismatch", level=logging.WARNING, path=path, features=n_f, labels=n_l, truncated_to=_min)
+            log_process("data", "embedding_size_mismatch", level=logging.WARNING, path=path, features=n_f, labels=n_l,
+                        truncated_to=_min)
             self.features = self.features[:_min]
             self.labels = self.labels[:_min]
-            
+
         self.n = self.features.shape[0]
         print(f"  EmbeddingDataset '{path}': {self.n:,} samples, feat={tuple(self.features.shape[1:])}")
-        log_process("data", "embedding_dataset_loaded", path=path, samples=self.n, feature_shape=tuple(self.features.shape[1:]))
+        log_process("data", "embedding_dataset_loaded", path=path, samples=self.n,
+                    feature_shape=tuple(self.features.shape[1:]))
 
-    def __len__(self): 
+    def __len__(self):
         return self.n
-        
-    def __getitem__(self, i): 
+
+    def __getitem__(self, i):
         return self.features[i], self.labels[i]
+
 
 def seed_worker(worker_id):
     """
@@ -125,9 +133,10 @@ def seed_worker(worker_id):
     Prevents different workers from generating identical augmentation noise or shuffling.
     """
     import random
-    w = torch.initial_seed() % 2**32
+    w = torch.initial_seed() % 2 ** 32
     np.random.seed(w)
     random.seed(w)
+
 
 def get_dataloaders():
     """
@@ -136,31 +145,31 @@ def get_dataloaders():
     """
     # Dynamic worker calculation based on CPU topology
     NUM_WORKERS = 0 if os.name == "nt" else min(4, multiprocessing.cpu_count() - 1)
-    
+
     train_emb_dataset = EmbeddingDataset(os.path.join(EMBEDDING_DIR, "train_embeddings.pt"))
-    val_emb_dataset   = EmbeddingDataset(os.path.join(EMBEDDING_DIR, "val_embeddings.pt"))
-    test_emb_dataset  = EmbeddingDataset(os.path.join(EMBEDDING_DIR, "test_embeddings.pt"))
-    
+    val_emb_dataset = EmbeddingDataset(os.path.join(EMBEDDING_DIR, "val_embeddings.pt"))
+    test_emb_dataset = EmbeddingDataset(os.path.join(EMBEDDING_DIR, "test_embeddings.pt"))
+
     # Shared configuration for DataLoader lifecycle management
     _loader_kw = dict(
-        batch_size=BATCH_SIZE, 
-        num_workers=NUM_WORKERS, 
-        pin_memory=(torch.cuda.is_available() and NUM_WORKERS > 0), 
-        worker_init_fn=seed_worker, 
-        generator=DATALOADER_GENERATOR, 
-        persistent_workers=(NUM_WORKERS > 0), 
+        batch_size=BATCH_SIZE,
+        num_workers=NUM_WORKERS,
+        pin_memory=(torch.cuda.is_available() and NUM_WORKERS > 0),
+        worker_init_fn=seed_worker,
+        generator=DATALOADER_GENERATOR,
+        persistent_workers=(NUM_WORKERS > 0),
         drop_last=False
     )
-    
-    train_loader = DataLoader(train_emb_dataset, shuffle=True,  **_loader_kw)
-    val_loader   = DataLoader(val_emb_dataset,   shuffle=False, **_loader_kw)
-    test_loader  = DataLoader(test_emb_dataset,  shuffle=False, **_loader_kw)
-    
-    log_process("data", "dataloaders_ready", 
-                batch_size=BATCH_SIZE, 
-                workers=NUM_WORKERS, 
-                train_batches=len(train_loader), 
-                val_batches=len(val_loader), 
+
+    train_loader = DataLoader(train_emb_dataset, shuffle=True, **_loader_kw)
+    val_loader = DataLoader(val_emb_dataset, shuffle=False, **_loader_kw)
+    test_loader = DataLoader(test_emb_dataset, shuffle=False, **_loader_kw)
+
+    log_process("data", "dataloaders_ready",
+                batch_size=BATCH_SIZE,
+                workers=NUM_WORKERS,
+                train_batches=len(train_loader),
+                val_batches=len(val_loader),
                 test_batches=len(test_loader))
-    
+
     return train_emb_dataset, train_loader, val_loader, test_loader, NUM_WORKERS
