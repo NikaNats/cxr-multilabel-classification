@@ -26,10 +26,11 @@ class DeepEnsembleTTAEvaluator:
     """
 
     def __init__(self, model_class, checkpoint_paths, device_, adj_norm_np=None, radlex_path="radlex_embeddings_14.pth",
-                 num_mc_passes=10):
+                 num_mc_passes=10, logit_adj=None):
         self.device = device_
         self.T = num_mc_passes  # Number of stochastic forward passes per model
         self.models = []
+        self.logit_adj = logit_adj  # Store the adjustment vector
 
         # Load RadLex clinical embeddings for the GraphGPS logic
         radlex = ensure_radlex_embeddings(path=radlex_path, pathologies=RADLEX_PATHOLOGIES,
@@ -79,6 +80,11 @@ class DeepEnsembleTTAEvaluator:
                 for _ in range(self.T):
                     out = m(feats)
                     logits = out[0] if isinstance(out, tuple) else out
+                    
+                    # Add the logit adjustment before metrics!
+                    if self.logit_adj is not None:
+                        logits = logits + self.logit_adj
+                        
                     # Convert evidential logits to probabilities for sampling
                     prob, _, _ = get_evidential_metrics(logits)
                     mc_passes.append(prob.cpu().numpy())
@@ -185,7 +191,7 @@ class EvidentialEvaluator:
         }
 
 
-def validate(model, loader, device_, thresholds=None):
+def validate(model, loader, device_, thresholds=None, logit_adj=None):
     """
     Clinical Validation Engine.
     Executes a high-fidelity evaluation during the training loop.
@@ -202,6 +208,10 @@ def validate(model, loader, device_, thresholds=None):
         for feats, lbls in tqdm(loader, desc="  Val", leave=False):
             logits = model(feats.to(device_))
             if isinstance(logits, tuple): logits = logits[0]
+
+            # Add the logit adjustment before metrics!
+            if logit_adj is not None:
+                logits = logits + logit_adj
 
             # Use strict evidential probabilities to mirror real-world inference
             probs, _, _ = get_evidential_metrics(logits)

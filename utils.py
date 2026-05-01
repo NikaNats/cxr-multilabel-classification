@@ -316,16 +316,29 @@ def paired_bootstrap_metric_test(fn, y_true, ya, yb, n=2000, seed=42):
 
 
 def optimise_thresholds(probs, labels, grid_steps=150):
-    """Searches for F1-maximizing thresholds in imbalanced medical data."""
+    """Searches for F1-maximizing thresholds across the true probability distribution."""
     n_cls = probs.shape[1]
     thr = np.full(n_cls, 0.5)
-    grid = np.linspace(0.005, 0.50, grid_steps)  # Focused on low prevalence
+    
     for k in range(n_cls):
         best_f1 = 0.0
         if labels[:, k].sum() == 0: continue
+        
+        # Extract the actual predicted percentiles to guarantee we test valid thresholds
+        grid = np.unique(np.percentile(probs[:, k], np.linspace(10, 99.9, grid_steps)))
+        grid = np.clip(grid, 0.00001, 0.99999)
+        
         for t in grid:
             f = f1_score(labels[:, k], (probs[:, k] >= t).astype(int), zero_division=0)
-            if f > best_f1: best_f1, thr[k] = f, t
+            if f > best_f1: 
+                best_f1, thr[k] = f, t
+                
+        # THE FIX: Fallback for ultra-rare classes if no F1 improvement was found
+        if best_f1 == 0.0:
+            # 99.5th percentile ensures a max False Positive Rate of 0.5% for unlearnable classes
+            # The + 1e-5 prevents edge-case collisions with uniform background probabilities
+            thr[k] = np.clip(np.percentile(probs[:, k], 99.5) + 1e-5, 0.00001, 0.99999)
+            
     return thr
 
 
