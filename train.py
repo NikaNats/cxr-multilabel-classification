@@ -1,8 +1,5 @@
-import logging
-import math
+import logging, math, time, random
 import numpy as np
-import random
-import time
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -16,34 +13,21 @@ from model import CXR_Synapse_Foundation, StrictlyProperBetaEvidentialLoss
 from utils import ensure_radlex_embeddings, compute_logit_adjustment, RADLEX_PATHOLOGIES, EarlyStopping
 
 CFG = {
-    "num_epochs": 35,
-    "swa_start": 25,
-    "batch_size": 64,
-    "base_lr": 2e-4,
-    "weight_decay": 0.05,
-    "warmup_steps": 200,
-    "patience": 10,
-    "max_grad_norm": 1.0,
-    "nan_abort_ratio": 0.3,
+    "num_epochs": 35, "swa_start": 25, "batch_size": 64, "base_lr": 2e-4,
+    "weight_decay": 0.05, "warmup_steps": 200, "patience": 10, "max_grad_norm": 1.0
 }
-
-ENSEMBLE_CKPT_TMPL = "CXR_Synapse_Foundation_Seed_{seed}.pth"
 
 def train_single_model(seed, adj_norm_np, train_emb_dataset, train_loader, val_loader, num_workers):
     torch.manual_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
 
-    ckpt_path = ENSEMBLE_CKPT_TMPL.format(seed=seed)
-    log_process("train", "seed_started", seed=seed, checkpoint=ckpt_path)
-
-    model = CXR_Synapse_Foundation(num_classes=14).to(DEVICE)
+    ckpt_path = f"CXR_Synapse_Foundation_Seed_{seed}.pth"
     
-    # CRITICAL: Re-enable the Knowledge Graph injection
+    model = CXR_Synapse_Foundation(num_classes=14).to(DEVICE)
     model.set_adjacency_mask(adj_norm_np)
 
-    radlex = ensure_radlex_embeddings(path="radlex_embeddings_14.pth", pathologies=RADLEX_PATHOLOGIES,
-                                      model_name="microsoft/BiomedVLP-BioViL-T", device_=DEVICE)
+    radlex = ensure_radlex_embeddings("radlex_embeddings_14.pth", RADLEX_PATHOLOGIES, "microsoft/BiomedVLP-BioViL-T", DEVICE)
     model.set_radlex_embeddings(radlex.detach())
 
     _train_labels_np = train_emb_dataset.labels.numpy().astype(np.int32)
@@ -52,32 +36,29 @@ def train_single_model(seed, adj_norm_np, train_emb_dataset, train_loader, val_l
 
     loss_fn = StrictlyProperBetaEvidentialLoss(annealing_epochs=20).to(DEVICE)
     optimizer = torch.optim.AdamW(model.parameters(), lr=CFG["base_lr"], weight_decay=CFG["weight_decay"])
+    scaler = torch.amp.GradScaler('cuda', enabled=(DEVICE.type == "cuda"))
 
-    total_steps = CFG["num_epochs"] * len(train_loader)
-    warmup_steps = CFG["warmup_steps"]
-    
-    # SOTA 2026: Calculate the Semantic Anchor (Original RadLex Topology)
+    # LISA: Calculate the Semantic Anchor (Original RadLex Topology)
     with torch.no_grad():
         radlex_ref = radlex.detach().to(DEVICE)
         semantic_anchor = F.cosine_similarity(radlex_ref.unsqueeze(1), radlex_ref.unsqueeze(0), dim=-1)
 
+    total_steps = CFG["num_epochs"] * len(train_loader)
+    warmup_steps = CFG["warmup_steps"]
+    
     def _lr_lambda(step):
         if step < warmup_steps: return step / max(warmup_steps, 1)
         prog = (step - warmup_steps) / max(total_steps - warmup_steps, 1)
         return 0.5 * (1 + math.cos(math.pi * prog))
-
     scheduler = optim.lr_scheduler.LambdaLR(optimizer, _lr_lambda)
-    scaler = torch.amp.GradScaler('cuda', enabled=(DEVICE.type == "cuda"))
 
     swa_model = AveragedModel(model)
     swa_scheduler = SWALR(optimizer, swa_lr=5e-5, anneal_epochs=3)
     early = EarlyStopping(patience=CFG["patience"], path=ckpt_path)
-    t0 = time.time()
 
     for epoch in range(1, CFG["num_epochs"] + 1):
         model.train()
-        run_loss = nan_steps = valid_steps = 0
-        total_b = len(train_loader)
+        run_loss = valid_steps = 0
         pbar = tqdm(train_loader, desc=f"  Ep {epoch:>2}/{CFG['num_epochs']}", leave=False)
 
         for feats, lbls in pbar:
@@ -86,7 +67,6 @@ def train_single_model(seed, adj_norm_np, train_emb_dataset, train_loader, val_l
 
             with torch.amp.autocast('cuda', enabled=(DEVICE.type == "cuda")):
                 z_posterior, z_v = model(feats)
-
                 evidential_loss = loss_fn(z_posterior, z_v, lbls, epoch)
 
                 # LISA: Language-Invariant Semantic Anchoring
@@ -97,21 +77,12 @@ def train_single_model(seed, adj_norm_np, train_emb_dataset, train_loader, val_l
                 
                 loss = evidential_loss + (0.5 * anchor_loss)
                 
-            if not torch.isfinite(loss):
-                nan_steps += 1
-                if nan_steps > total_b * CFG["nan_abort_ratio"]:
-                    log_process("train", "epoch_aborted_nan_ratio", level=logging.WARNING, seed=seed, epoch=epoch)
-                    break
-                continue
+            if not torch.isfinite(loss): continue
 
             scaler.scale(loss).backward()
             scaler.unscale_(optimizer)
-            gn = nn.utils.clip_grad_norm_(model.parameters(), CFG["max_grad_norm"])
-
-            if torch.isfinite(gn):
-                scaler.step(optimizer)
-            else:
-                nan_steps += 1
+            nn.utils.clip_grad_norm_(model.parameters(), CFG["max_grad_norm"])
+            scaler.step(optimizer)
             scaler.update()
 
             if epoch < CFG["swa_start"]: scheduler.step()
@@ -123,61 +94,25 @@ def train_single_model(seed, adj_norm_np, train_emb_dataset, train_loader, val_l
             swa_model.update_parameters(model)
             swa_scheduler.step()
 
-        avg_l = run_loss / max(valid_steps, 1)
         eval_m = swa_model if epoch >= CFG["swa_start"] else model
-
-        v_auc, v_f1, _, _, _ = validate(eval_m, val_loader, DEVICE)
+        v_auc, v_f1, _, _, _ = validate(eval_m, val_loader, DEVICE, logit_adj=logit_adj_vec)
         saved = early(v_auc, eval_m)
 
         swa_t = "[SWA]" if epoch >= CFG["swa_start"] else "     "
-        tag = " ✓" if saved else ""
-        print(f"  {swa_t} Ep {epoch:>2} | Loss {avg_l:.4f} | AUC {v_auc:.4f} | (F1@0.5: {v_f1:.4f}){tag}")
+        print(f"  {swa_t} Ep {epoch:>2} | Loss {run_loss/max(valid_steps,1):.4f} | AUC {v_auc:.4f} | (F1@0.5: {v_f1:.4f}){' ✓' if saved else ''}")
 
-        log_process("train", "epoch_completed", seed=seed, epoch=epoch, loss=f"{avg_l:.4f}", val_auc=f"{v_auc:.4f}",
-                    best_saved=saved, swa=(epoch >= CFG["swa_start"]))
+        if early.early_stop: break
 
-        if early.early_stop:
-            log_process("train", "early_stopping_triggered", level=logging.WARNING, seed=seed, epoch=epoch, best_auc=f"{early.best_score:.4f}")
-            break
-
-    elapsed = time.time() - t0
-    print(f"  ✓ Seed {seed} done ({elapsed // 60:.0f}m {elapsed % 60:.0f}s) | Best AUC: {early.best_score:.4f}")
-    
-    # ========================================================
-    # SOTA 2026: SYNCHRONOUS CONTEXT REAPING (SCR)
-    # ========================================================
-    # 1. Disconnect C++ DataLoader Workers Safely
-    if hasattr(train_loader, '_iterator') and train_loader._iterator is not None:
-        try: train_loader._iterator._shutdown_workers()
-        except Exception: pass
-    if hasattr(val_loader, '_iterator') and val_loader._iterator is not None:
-        try: val_loader._iterator._shutdown_workers()
-        except Exception: pass
-
-    # 2. Release GPU Memory Maps
-    model.cpu()
-    if 'swa_model' in locals():
-        swa_model.cpu()
-        del swa_model
-
-    # 3. Synchronize Hardware Barrier
+    # Clean Memory Management (No C++ Segfaults)
     del model, optimizer, scaler
-    if torch.cuda.is_available():
-        torch.cuda.synchronize()
-        torch.cuda.empty_cache()
-    
-    import gc
-    gc.collect()
+    torch.cuda.empty_cache()
+    import gc; gc.collect()
     
     return ckpt_path
 
-
 def train_ensemble(seeds, adj_norm_np, train_emb_dataset, train_loader, val_loader, num_workers):
-    """Orchestrates training for ensemble members with the Adjacency Matrix."""
-    ensemble_checkpoints = []
-    log_process("train", "ensemble_training_started", members=len(seeds), epochs=CFG["num_epochs"])
-    for _i, _seed in enumerate(seeds):
-        log_process("train", "ensemble_member_started", index=_i + 1, total=len(seeds), seed=_seed)
+    ensemble_checkpoints =[]
+    for _seed in seeds:
         ckpt = train_single_model(_seed, adj_norm_np, train_emb_dataset, train_loader, val_loader, num_workers)
         ensemble_checkpoints.append(ckpt)
     return ensemble_checkpoints

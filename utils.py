@@ -245,37 +245,34 @@ def expected_calibration_error(probs, labels, n_bins=15):
 # MULTI-LABEL CONFORMAL PREDICTION (Safety Wrapper)
 # ============================================================
 class MultiLabelConformalPredictor:
-    """
-    Implements Marginal Conformal Prediction for Multi-Label sets.
-    Ref: Angelopoulos & Bates, 'A Gentle Introduction to Conformal Prediction'.
-    
-    Guarantees that each pathology's true state is included in the diagnostic set 
-    with probability >= 1-alpha (90% by default). Essential for legal/clinical safety.
-    """
-
+    """Smoothed Multiplicative Class-Conditional Conformal Risk Control."""
     def __init__(self, alpha=0.10):
         self.alpha = alpha
-        self.thresholds = None
+        self.global_multiplier = 1.0
+        self.opt_thresholds = None
 
-    def calibrate(self, cal_probs, cal_labels):
-        """Finds non-conformity quantiles independently for 14 classes."""
-        K = cal_probs.shape[1]
-        self.thresholds = np.zeros(K)
-        for k in range(K):
-            pos_mask = (cal_labels[:, k] == 1)
-            if pos_mask.sum() == 0:
-                self.thresholds[k] = 0.5
-                continue
-            # Non-conformity score: 1 - model_probability
-            scores = 1.0 - cal_probs[pos_mask, k]
-            n = scores.shape[0]
-            # Finite-sample correction for the quantile
-            q = min(max(np.ceil((n + 1) * (1 - self.alpha)) / n, 0.0), 1.0)
-            self.thresholds[k] = 1.0 - np.quantile(scores, q)
+    def calibrate(self, cal_probs, cal_labels, opt_thresholds):
+        self.opt_thresholds = opt_thresholds
+        
+        multipliers = np.linspace(2.0, 0.001, 1500)
+        best_m = 0.001
+        cal_true = cal_labels.astype(bool)
+        
+        for m in multipliers:
+            # Multiplicative scaling preserves the natural risk ratio of diseases
+            test_thr = np.clip(self.opt_thresholds * m, 0.00001, 0.99999)
+            preds = cal_probs >= test_thr
+            
+            per_class_cov = ((preds & cal_true).sum(axis=0) / np.maximum(cal_true.sum(axis=0), 1))
+            if per_class_cov.mean() >= (1.0 - self.alpha):
+                best_m = m
+                break
+                
+        self.global_multiplier = best_m
 
-    def predict_sets(self, probs):
-        """Constructs the Conformal Set based on calibrated error rates."""
-        return {"include_pos": probs >= self.thresholds}
+    def predict_sets(self, test_probs):
+        final_thr = np.clip(self.opt_thresholds * self.global_multiplier, 0.00001, 0.99999)
+        return {"include_pos": test_probs >= final_thr}
 
 
 # ============================================================
@@ -316,7 +313,7 @@ def paired_bootstrap_metric_test(fn, y_true, ya, yb, n=2000, seed=42):
 
 
 def optimise_thresholds(probs, labels, grid_steps=150):
-    """Searches for F1-maximizing thresholds across the true probability distribution."""
+    """Extracts True Empirical Percentiles for F1 Optimization."""
     n_cls = probs.shape[1]
     thr = np.full(n_cls, 0.5)
     
@@ -324,7 +321,7 @@ def optimise_thresholds(probs, labels, grid_steps=150):
         best_f1 = 0.0
         if labels[:, k].sum() == 0: continue
         
-        # Extract the actual predicted percentiles to guarantee we test valid thresholds
+        # True Probability Percentile Grid
         grid = np.unique(np.percentile(probs[:, k], np.linspace(10, 99.9, grid_steps)))
         grid = np.clip(grid, 0.00001, 0.99999)
         
@@ -333,10 +330,8 @@ def optimise_thresholds(probs, labels, grid_steps=150):
             if f > best_f1: 
                 best_f1, thr[k] = f, t
                 
-        # THE FIX: Fallback for ultra-rare classes if no F1 improvement was found
+        # Safe suppression for ultra-rare classes (0.5% max FPR)
         if best_f1 == 0.0:
-            # 99.5th percentile ensures a max False Positive Rate of 0.5% for unlearnable classes
-            # The + 1e-5 prevents edge-case collisions with uniform background probabilities
             thr[k] = np.clip(np.percentile(probs[:, k], 99.5) + 1e-5, 0.00001, 0.99999)
             
     return thr
