@@ -258,13 +258,19 @@ class MultiLabelConformalPredictor:
         best_m = 0.001
         cal_true = cal_labels.astype(bool)
         
+        # Added: Calculate total number of diseases
+        total_true = max(cal_true.sum(), 1)
+        
         for m in multipliers:
             # Multiplicative scaling preserves the natural risk ratio of diseases
             test_thr = np.clip(self.opt_thresholds * m, 0.00001, 0.99999)
             preds = cal_probs >= test_thr
             
-            per_class_cov = ((preds & cal_true).sum(axis=0) / np.maximum(cal_true.sum(axis=0), 1))
-            if per_class_cov.mean() >= (1.0 - self.alpha):
+            # FIXED: Perform MICRO-MARGINAL optimization (exactly as we calculate in main.py)
+            total_caught = (preds & cal_true).sum()
+            micro_cov = total_caught / total_true
+            
+            if micro_cov >= (1.0 - self.alpha):
                 best_m = m
                 break
                 
