@@ -13,14 +13,17 @@
 % Sylfaen არის SEU-ს მიერ მოთხოვნილი ოფიციალური შრიფტი
 \setmainfont[
   Ligatures=TeX,
-  SizeFeatures={Size=12}
+  AutoFakeBold=2.0,
+  AutoFakeSlant=0.15
 ]{Sylfaen}
 
 \newfontfamily\georgianfont[
-  SizeFeatures={Size=12}
+  AutoFakeBold=2.0,
+  AutoFakeSlant=0.15
 ]{Sylfaen}
 \newfontfamily\georgianfonttt[
-  SizeFeatures={Size=12}
+  AutoFakeBold=2.0,
+  AutoFakeSlant=0.15
 ]{Sylfaen}
 
 \usepackage{setspace}
@@ -55,6 +58,8 @@
 \setstretch{1.5} % 1.5 ხაზთაშორისი დაშორება
 \setlength{\parindent}{1.2em}
 \setlength{\parskip}{0.2em}
+\emergencystretch=3em
+\sloppy
 
 % სქოლიოს ფორმატირება: ზომა 10, ერთმაგი დაშორება
 \usepackage[perpage,bottom]{footmisc}
@@ -156,7 +161,7 @@
 \addcontentsline{toc}{chapter}{ანოტაცია}
 გულ-მკერდის რენტგენოგრამების (CXR) მრავალლეიბლიანი კლასიფიკაცია თანამედროვე სამედიცინო ხელოვნური ინტელექტის ერთ-ერთ მთავარ გამოწვევას წარმოადგენს. ძირითად პრობლემებს შორისაა კლასთა უკიდურესი დისბალანსი, წარმოდგენების დრიფტი (Representational Drift) და გაყინული ვიზუალური მოდელების ზე-თავდაჯერებულობა (Overconfidence). წინამდებარე ნაშრომში წარმოდგენილია \textbf{CXR-Synapse} — კლინიკურად ორიენტირებული არქიტექტურა, რომელიც პირველად აერთიანებს LISA (Language-Invariant Semantic Anchoring) რეგულარიზაციას, PaQ (Pathology-as-Query) სივრცით ყურადღების მექანიზმს 2D ანატომიური პოზიციონირებით და ბეტა-ევიდენციურ ლოგიკას.
 
-ჩატარებულმა ექსპერიმენტებმა ChestMNIST მონაცემთა ბაზაზე აჩვენა, რომ შემოთავაზებული მეთოდი არღვევს ტრადიციულ ზღვარს და აღწევს მრავალლეიბლიან AUC 0.7913-ს. უმთავრესი მიღწევაა მოდელის სრულყოფილი კალიბრაცია, რისი დადასტურებაცაა რეკორდულად დაბალი შეცდომის მაჩვენებელი — ECE 0.0120. ნაშრომში ასევე ინტეგრირებულია Micro-Marginal კონფორმალური რისკის კონტროლი, რაც უზრუნველყოფს იშვიათი პათოლოგიების 92.4\%-იან კლინიკურ დაფარვას და აბათილებს მოდელის მიერ ცრუ პროგნოზების გენერირების რისკს. 
+ჩატარებულმა ექსპერიმენტებმა ChestMNIST მონაცემთა ბაზაზე აჩვენა, რომ შემოთავაზებული მეთოდი არღვევს ტრადიციულ ზღვარს და აღწევს მრავალლეიბლიან AUC 0.7913-ს. უმთავრესი მიღწევაა მოდელის სრულყოფილი კალიბრაცია, რისი დადასტურებაცაა რეკორდულად დაბალი შეცდომის მაჩვენებელი — ECE 0.0120. ნაშრომში ასევე ინტეგრირებულია Micro-Marginal კონფორმალური რისკის კონტროლი; საბოლოო კოდში რეპორტირებული მაჩვენებელი არის კლასთა საშუალო კონფორმალური დაფარვა 92.4\%, რაც ამცირებს ჭეშმარიტი პათოლოგიის გამოტოვების რისკს.
 
 აღნიშნული შედეგები და სტატისტიკურად სარწმუნო (p=0.000) არქიტექტურა ქმნის მყარ საფუძველს Trustworthy AI სისტემების კლინიკურ პრაქტიკაში უსაფრთხოდ დასანერგად.
 
@@ -172,7 +177,7 @@
 
 Chest X-ray (CXR) multi-label classification remains challenging due to severe class imbalance, representational drift, and model overconfidence in frozen vision backbones. This thesis proposes \textbf{CXR-Synapse}, a clinically grounded, state-of-the-art framework that integrates LISA (Language-Invariant Semantic Anchoring), PaQ (Pathology-as-Query) spatial cross-attention with 2D anatomical encodings, and Strictly Proper Beta Evidential logic for robust uncertainty quantification.
 
-Experimental results on the ChestMNIST dataset demonstrate that the proposed architecture overcomes traditional representational bottlenecks, achieving a multi-label AUC of 0.7913. The paramount scientific contribution is the near-perfect probabilistic calibration of the model, yielding an Expected Calibration Error (ECE) of 0.0120. Furthermore, the thesis implements Micro-Marginal Conformal Risk Control, successfully guaranteeing a 92.4\% clinical coverage rate while explicitly balancing the fundamental mathematical tradeoff between discriminative power and prediction set size.
+Experimental results on the ChestMNIST dataset demonstrate that the proposed architecture overcomes traditional representational bottlenecks, achieving a multi-label AUC of 0.7913. The paramount scientific contribution is the near-perfect probabilistic calibration of the model, yielding an Expected Calibration Error (ECE) of 0.0120. Furthermore, the thesis implements Micro-Marginal Conformal Risk Control; the current evaluation code reports a 92.4\% mean per-class conformal coverage rate while explicitly balancing the fundamental mathematical tradeoff between discriminative power and prediction set size.
 
 The statistically significant findings (p=0.000) and the rigorous, publication-level evaluation protocol position this framework as a defensible and highly reliable blueprint for deploying Trustworthy AI in high-stakes clinical environments.
 
@@ -194,7 +199,8 @@ Chest X-ray, multi-label classification, Pathology-as-Query, LISA, calibration, 
 
 \chapter*{აბრევიატურების ჩამონათვალი}
 \addcontentsline{toc}{chapter}{აბრევიატურების ჩამონათვალი}
-\begin{longtable}{p{0.18\textwidth}p{0.76\textwidth}}
+\begin{center}
+\begin{tabular}{p{0.18\textwidth}p{0.76\textwidth}}
 \textbf{AI} & Artificial Intelligence (ხელოვნური ინტელექტი) \\
 \textbf{AUC} & Area Under the Receiver Operating Characteristic Curve (ROC მრუდქვეშა ფართობი) \\
 \textbf{BCE} & Binary Cross-Entropy (ბინარული ჯვარედინი ენტროპია) \\
@@ -206,7 +212,8 @@ Chest X-ray, multi-label classification, Pathology-as-Query, LISA, calibration, 
 \textbf{SOTA} & State of the Art (მიმდინარე ტექნოლოგიური პიკი) \\
 \textbf{SWA} & Stochastic Weight Averaging \\
 \textbf{VLM} & Vision-Language Model (ვიზუალურ-ტექსტური მოდელი) \\
-\end{longtable}
+\end{tabular}
+\end{center}
 \chapter{შესავალი}
 
 \section{პრობლემის აქტუალობა}
@@ -537,7 +544,7 @@ Average Prediction Set Size & 8.85 \\
 ეს შედეგი პირდაპირ კავშირშია \textbf{Strictly Proper Beta Evidential Loss}-ის გამოყენებასთან, რომელმაც აღმოფხვრა ნეირონული ქსელებისთვის დამახასიათებელი ზე-თავდაჯერებულობის (Overconfidence) პრობლემა. დაბალი ECE ნიშნავს, რომ თუ მოდელი პროგნოზირებს პათოლოგიას 80\% ალბათობით, რეალური შემთხვევების 78.8-81.2\% მართლაც შეიცავს მოცემულ დაავადებას.
 
 \section{კონფორმალური უსაფრთხოების გარანტიები}
-\texttt{MultiLabelConformalPredictor}-ის მეშვეობით მიღწეულ იქნა **92.4\%-იანი Micro-Marginal დაფარვა (Coverage)**. ეს ნიშნავს, რომ პაციენტების აბსოლუტურ უმრავლესობაში ჭეშმარიტი პათოლოგია გარანტირებულად ხვდება მოდელის მიერ შემოთავაზებულ პროგნოზების სიმრავლეში.
+\texttt{MultiLabelConformalPredictor}-ის მეშვეობით მიღწეულ იქნა \textbf{92.4\%-იანი კლასთა საშუალო კონფორმალური დაფარვა (Coverage)}. კალიბრაცია Micro-Marginal კრიტერიუმს იყენებს, ხოლო \texttt{main.py}-ის ფინალური ანგარიში per-class coverage-ის საშუალოს ბეჭდავს; ეს ზუსტად ასახავს მიმდინარე კოდის ქცევას.
 
 საშუალო პროგნოზების სიმრავლის ზომა (**Set Size = 8.85**) ასახავს მათემატიკურ კომპრომისს (Tradeoff) 0.79 AUC-სა და 92\%-იან უსაფრთხოებას შორის. ეს მაჩვენებელი წარმოადგენს „გულწრფელი AI-ს“ (Honest AI) მაგალითს, რომელიც მონაცემთა 10\%-იანი დეცილის პირობებში ანიჭებს პრიორიტეტს პაციენტის უსაფრთხოებას და თავს არიდებს მცდარი, კატეგორიული დიაგნოზების დასმას.
 
@@ -895,7 +902,8 @@ Evaluation ფაზა მკაცრად გამიჯნულია ს
 \chapter{დანართი №1: პროგრამული არქიტექტურის მატრიცა}
 წინამდებარე დანართი ახდენს \texttt{CXR-Synapse} ჩარჩოს თეორიული კომპონენტების შესაბამისობას რეალურ იმპლემენტაციასთან, რაც აუცილებელია სისტემის აუდიტისთვის.
 
-\begin{longtable}{p{0.30\textwidth}p{0.60\textwidth}}
+\begin{center}
+\begin{tabular}{p{0.30\textwidth}p{0.60\textwidth}}
 \toprule
 \textbf{კომპონენტი} & \textbf{იმპლემენტაციის წყარო (ფაილი და ფუნქცია)} \\
 \midrule
@@ -917,7 +925,8 @@ Evaluation ფაზა მკაცრად გამიჯნულია ს
 \midrule
 \textbf{Forensic Audit} & \texttt{audit.py}: ინფორმაციული თეორიის, სივრცითი მორფოლოგიისა და კლინიკური ლოგიკის დიაგნოსტიკა. \\
 \bottomrule
-\end{longtable}
+\end{tabular}
+\end{center}
 
 \chapter{დანართი №2: სამეცნიერო რეპროდუცირებადობის ჩეკლისტი}
 \texttt{CXR-Synapse} პროექტის სრული ვალიდაციისთვის და შედეგების ხელახალი გენერირებისთვის, მკვლევარმა უნდა დაიცვას შემდეგი პროტოკოლი:
@@ -947,39 +956,43 @@ Evaluation ფაზა მკაცრად გამიჯნულია ს
 
 \chapter*{დანართი №1: სამაგისტრო ნაშრომის მოცულობა და სტრუქტურა}
 \addcontentsline{toc}{chapter}{დანართი №1: სამაგისტრო ნაშრომის მოცულობა და სტრუქტურა}
-\begin{longtable}{p{0.30\textwidth}p{0.20\textwidth}p{0.45\textwidth}}
+\begin{center}
+\begin{tabular}{p{0.30\textwidth}p{0.20\textwidth}p{0.45\textwidth}}
 \toprule
 \textbf{მოთხოვნის კატეგორია} & \textbf{სტატუსი} & \textbf{მტკიცებულება ნაშრომში} \\
 \midrule
-ფორმალიზებული სტრუქტურა & დაკმაყოფილებულია & სატიტულო გვერდი, დეკლარაცია, ანოტაციები, სარჩევი, ფიგურებისა და ცხრილების ნუსხა. \\
-პრობლემის დასმა და მოტივაცია & დაკმაყოფილებულია & თავი 1: პრობლემის აქტუალობა და კვლევის მიზნები. \\
-ობიექტი, საგანი და ამოცანები & დაკმაყოფილებულია & თავი 1: კვლევის ობიექტი, საგანი და 6 საკვანძო ამოცანა. \\
-სამეცნიერო სიახლე & დაკმაყოფილებულია & თავი 3: LISA და PaQ არქიტექტურული ინოვაციები. \\
-ლიტერატურის მიმოხილვა & დაკმაყოფილებულია & თავი 2: VLM და კალიბრაციის თანამედროვე SOTA-ს ანალიზი. \\
-მეთოდოლოგიური სიმყარე & დაკმაყოფილებულია & თავი 3 და 4: ბეტა-ევიდენციური ლოგიკისა და მათემატიკური აპარატის აღწერა. \\
-ექსპერიმენტული პროტოკოლი & დაკმაყოფილებულია & თავი 4: ბუტსტრაპ-სტატისტიკა და დეტერმინიზმის Lockdown. \\
-შედეგების ინტერპრეტაცია & დაკმაყოფილებულია & თავი 5: რაოდენობრივი და ხარისხობრივი (Forensic) ანალიზი. \\
-დისკუსია და შეზღუდვები & დაკმაყოფილებულია & თავი 6: Pareto-Frontier-ის და ვალიდობის საფრთხეების ანალიზი. \\
-რეპროდუცირებადობა & დაკმაყოფილებულია & დანართი №1 და №2: Provenance Chain და Checklist. \\
-აკადემიური ეთიკა & დაკმაყოფილებულია & დეკლარაცია და დანართი №3: ეთიკური განცხადება. \\
+ფორმალიზებული სტრუქტურა & კი & სატიტულო გვერდი, დეკლარაცია, ანოტაციები, სარჩევი, ფიგურებისა და ცხრილების ნუსხა. \\
+პრობლემის დასმა და მოტივაცია & კი & თავი 1: პრობლემის აქტუალობა და კვლევის მიზნები. \\
+ობიექტი, საგანი და ამოცანები & კი & თავი 1: კვლევის ობიექტი, საგანი და 6 საკვანძო ამოცანა. \\
+სამეცნიერო სიახლე & კი & თავი 3: LISA და PaQ არქიტექტურული ინოვაციები. \\
+ლიტერატურის მიმოხილვა & კი & თავი 2: VLM და კალიბრაციის თანამედროვე SOTA-ს ანალიზი. \\
+მეთოდოლოგიური სიმყარე & კი & თავი 3 და 4: ბეტა-ევიდენციური ლოგიკისა და მათემატიკური აპარატის აღწერა. \\
+ექსპერიმენტული პროტოკოლი & კი & თავი 4: ბუტსტრაპ-სტატისტიკა და დეტერმინიზმის Lockdown. \\
+შედეგების ინტერპრეტაცია & კი & თავი 5: რაოდენობრივი და ხარისხობრივი (Forensic) ანალიზი. \\
+დისკუსია და შეზღუდვები & კი & თავი 6: Pareto-Frontier-ის და ვალიდობის საფრთხეების ანალიზი. \\
+რეპროდუცირებადობა & კი & დანართი №1 და №2: Provenance Chain და Checklist. \\
+აკადემიური ეთიკა & კი & დეკლარაცია და დანართი №3: ეთიკური განცხადება. \\
 \bottomrule
-\end{longtable}
+\end{tabular}
+\end{center}
 
 \chapter*{დანართი №2: სამაგისტრო ნაშრომის ფორმატირების შესაბამისობა}
 \addcontentsline{toc}{chapter}{დანართი №2: სამაგისტრო ნაშრომის ფორმატირების შესაბამისობა}
-\begin{longtable}{p{0.35\textwidth}p{0.20\textwidth}p{0.40\textwidth}}
+\begin{center}
+\begin{tabular}{p{0.35\textwidth}p{0.20\textwidth}p{0.40\textwidth}}
 \toprule
 \textbf{ფორმალური ელემენტი} & \textbf{სტატუსი} & \textbf{იმპლემენტაცია} \\
 \midrule
-ფურცლის ზომა & დაკმაყოფილებულია & A4 ფორმატი (geometry პაკეტი). \\
-მინდვრები (Margins) & დაკმაყოფილებულია & მარცხენა: 3სმ, მარჯვენა: 2სმ, ზედა/ქვედა: 2.5სმ. \\
-ძირითადი შრიფტი & დაკმაყოფილებულია & Sylfaen, ზომა 12. \\
-ხაზთაშორისი დაშორება & დაკმაყოფილებულია & 1.5 ინტერვალი (\texttt{\textbackslash setstretch\{1.5\}}). \\
-გვერდების ნუმერაცია & დაკმაყოფილებულია & შესავალამდე: რომაული, შესავლიდან: არაბული. \\
-თავებისა და სექციების სტილი & დაკმაყოფილებულია & სათაურები: 16pt (bold), სექციები: 14pt (bold). \\
-ციტირების სტანდარტი & დაკმაყოფილებულია & სქოლიოები (Footnotes) და ბიბლიოგრაფია. \\
+ფურცლის ზომა & კი & A4 ფორმატი (geometry პაკეტი). \\
+მინდვრები (Margins) & კი & ყველა მხარე: 2.5სმ, რაც შეესაბამება 1 inch/normal მოთხოვნას. \\
+ძირითადი შრიფტი & კი & Sylfaen, ზომა 12. \\
+ხაზთაშორისი დაშორება & კი & 1.5 ინტერვალი (\texttt{\textbackslash setstretch\{1.5\}}). \\
+გვერდების ნუმერაცია & კი & შესავალიდან: არაბული ნუმერაცია. \\
+თავებისა და სექციების სტილი & კი & სათაურები: 16pt (bold), სექციები: 14pt (bold). \\
+ციტირების სტანდარტი & კი & სქოლიოები (Footnotes) და BibTeX ბიბლიოგრაფია. \\
 \bottomrule
-\end{longtable}
+\end{tabular}
+\end{center}
 
 \chapter*{დანართი №3: სამაგისტრო ნაშრომის შესრულების გეგმა}
 \addcontentsline{toc}{chapter}{დანართი №3: სამაგისტრო ნაშრომის შესრულების გეგმა}
@@ -1002,7 +1015,8 @@ Evaluation ფაზა მკაცრად გამიჯნულია ს
 
 \chapter*{დანართი №4: ხელმძღვანელის შეფასების უწყისი (შაბლონი)}
 \addcontentsline{toc}{chapter}{დანართი №4: ხელმძღვანელის შეფასების უწყისი}
-\begin{longtable}{p{0.55\textwidth}p{0.18\textwidth}p{0.18\textwidth}}
+\begin{center}
+\begin{tabular}{p{0.55\textwidth}p{0.18\textwidth}p{0.18\textwidth}}
 \toprule
 \textbf{შეფასების კრიტერიუმი} & \textbf{მაქს. ქულა} & \textbf{მინიჭებული ქულა} \\
 \midrule
@@ -1015,14 +1029,16 @@ Evaluation ფაზა მკაცრად გამიჯნულია ს
 \midrule
 \textbf{ჯამური ქულა} & \textbf{100} &  \\
 \bottomrule
-\end{longtable}
+\end{tabular}
+\end{center}
 \noindent ხელმძღვანელის კომენტარი: \rule{12.5cm}{0.4pt} \\
 \vspace{0.8cm}
 \noindent ხელმოწერა: \rule{5cm}{0.4pt}\hfill თარიღი: \rule{3cm}{0.4pt}
 
 \chapter*{დანართი №5: რეცენზენტის შეფასების უწყისი (შაბლონი)}
 \addcontentsline{toc}{chapter}{დანართი №5: რეცენზენტის შეფასების უწყისი}
-\begin{longtable}{p{0.55\textwidth}p{0.18\textwidth}p{0.18\textwidth}}
+\begin{center}
+\begin{tabular}{p{0.55\textwidth}p{0.18\textwidth}p{0.18\textwidth}}
 \toprule
 \textbf{შეფასების კრიტერიუმი} & \textbf{მაქს. ქულა} & \textbf{მინიჭებული ქულა} \\
 \midrule
@@ -1035,14 +1051,16 @@ Evaluation ფაზა მკაცრად გამიჯნულია ს
 \midrule
 \textbf{ჯამური ქულა} & \textbf{100} &  \\
 \bottomrule
-\end{longtable}
+\end{tabular}
+\end{center}
 \noindent რეცენზენტის რეკომენდაცია: \rule{12cm}{0.4pt} \\
 \vspace{0.8cm}
 \noindent ხელმოწერა: \rule{5cm}{0.4pt}\hfill თარიღი: \rule{3cm}{0.4pt}
 
 \chapter*{დანართი №6: დაცვის კომისიის შეფასების უწყისი}
 \addcontentsline{toc}{chapter}{დანართი №6: დაცვის კომისიის შეფასების უწყისი}
-\begin{longtable}{p{0.46\textwidth}p{0.14\textwidth}p{0.14\textwidth}p{0.14\textwidth}}
+\begin{center}
+\begin{tabular}{p{0.46\textwidth}p{0.14\textwidth}p{0.14\textwidth}p{0.14\textwidth}}
 \toprule
 \textbf{შეფასების კომპონენტი} & \textbf{წევრი 1} & \textbf{წევრი 2} & \textbf{წევრი 3} \\
 \midrule
@@ -1052,7 +1070,8 @@ Evaluation ფაზა მკაცრად გამიჯნულია ს
 \midrule
 \textbf{ჯამური ქულა (100-ქულიანი შკალა)} &  &  &  \\
 \bottomrule
-\end{longtable}
+\end{tabular}
+\end{center}
 \noindent კომისიის საბოლოო გადაწყვეტილება: \rule{11cm}{0.4pt} \\
 \vspace{0.8cm}
 \noindent კომისიის თავმჯდომარის ხელმოწერა: \rule{5cm}{0.4pt}\hfill თარიღი: \rule{3cm}{0.4pt}
@@ -1090,65 +1109,7 @@ Evaluation ფაზა მკაცრად გამიჯნულია ს
 \end{itemize}
 
 \addcontentsline{toc}{chapter}{ბიბლიოგრაფია}
-\begin{thebibliography}{99}
-
-% --- Dataset and Benchmarks ---
-\bibitem{yang2023medmnistv2}
-J. Yang et al., "MedMNIST v2: A Large-Scale Lightweight Benchmark for 2D and 3D Biomedical Image Classification," \emph{Scientific Data}, vol. 9, no. 1, pp. 1--9, 2023.
-
-\bibitem{wang2017chestxray14}
-X. Wang et al., "ChestX-ray8: Hospital-Scale Chest X-Ray Database and Benchmarks," in \emph{IEEE CVPR}, 2017, pp. 3462--3471.
-
-% --- Foundation Models (The Core of CXR-Synapse) ---
-\bibitem{elixr_paper}
-Y. J. Liu et al., "ELIXR: Towards a unified and explainable chest X-ray foundation model," \emph{Google Health AI Research}, 2024.
-
-\bibitem{biovil_paper}
-B. Boecking et al., "Making the Most of Text-to-Image for Chest X-Rays," \emph{microsoft/BiomedVLP-BioViL-T}, 2022.
-
-\bibitem{dosovitskiy2020image}
-A. Dosovitskiy et al., "An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale," in \emph{Int. Conf. Learn. Representations (ICLR)}, 2021.
-
-% --- Optimization and Theory ---
-\bibitem{menon_logit}
-A. K. Menon et al., "Long-tail learning via logit adjustment," in \emph{International Conference on Learning Representations (ICLR)}, 2021.
-
-\bibitem{izmailov2018swa}
-P. Izmailov et al., "Averaging Weights Leads to Wider Optima and Better Generalization," in \emph{Uncertainty in Artificial Intelligence (UAI)}, 2018.
-
-\bibitem{kingma2014adam}
-D. P. Kingma and J. Ba, "Adam: A Method for Stochastic Optimization," in \emph{ICLR}, 2015.
-
-% --- Uncertainty and Trustworthy AI (Evidential Logic) ---
-\bibitem{sensoy_evidential}
-M. Sensoy, L. Kaplan, and M. Kandemir, "Evidential Deep Learning to Quantify Classification Uncertainty," in \emph{Advances in Neural Information Processing Systems (NeurIPS)}, 2018.
-
-\bibitem{lakshminarayanan2017ensembles}
-B. Lakshminarayanan, A. Pritzel, and C. Blundell, "Simple and Scalable Predictive Uncertainty Estimation using Deep Ensembles," in \emph{NeurIPS}, 2017.
-
-% --- Conformal Prediction and Safety Guarantees ---
-\bibitem{angelopoulos2021conformal}
-A. N. Angelopoulos and S. Bates, "Conformal Risk Control," \emph{arXiv preprint arXiv:2107.07511}, 2024.
-
-\bibitem{guo2017calibration}
-C. Guo, G. Pleiss, Y. Sun, and K. Weinberger, "On Calibration of Modern Neural Networks," in \emph{International Conference on Machine Learning (ICML)}, 2017.
-
-% --- Clinical Standards and Data Integrity ---
-\bibitem{radlex2022reference}
-D. Rubin et al., "RadLex: A Multilingual Radiology Lexicon," \emph{Journal of Digital Imaging}, vol. 22, no. 2, pp. 207--216, 2009.
-
-\bibitem{guo2016drift}
-C. Guo and S. Chawla, "Data Leakage in Machine Learning: An Introduction and Overview," \emph{Wiley Interdisciplinary Reviews}, 2016.
-
-\bibitem{rivera2020spiritai}
-S. C. Rivera et al., "Guidelines for Clinical Trial Protocols for Interventions Involving AI: the SPIRIT-AI Extension," \emph{The Lancet}, vol. 385, 2020.
-
-\bibitem{collins2015tripod}
-G. S. Collins et al., "Transparent Reporting of a Multivariable Prediction Model (TRIPOD)," \emph{Annals of Internal Medicine}, vol. 162, 2015.
-
-\bibitem{hastie2009elements}
-T. Hastie, R. Tibshirani, and J. Friedman, \emph{The Elements of Statistical Learning}, 2nd ed., Springer, 2009.
-
-\end{thebibliography}
+\bibliographystyle{plain}
+\bibliography{CXR-Synapse-Masters-Thesis}
 
 \end{document}
