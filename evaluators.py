@@ -5,6 +5,7 @@ from sklearn.metrics import roc_auc_score, f1_score, average_precision_score
 from tqdm.auto import tqdm
 from model import get_evidential_metrics
 from utils import expected_calibration_error
+from config import log_process
 
 class DeepEnsembleTTAEvaluator:
     def __init__(self, model_class, checkpoint_paths, device_, adj_norm_np=None, num_mc_passes=10, logit_adj=None):
@@ -60,31 +61,12 @@ class DeepEnsembleTTAEvaluator:
 
         return {"auc": auc, "f1": f1, "per_class_ece": ece, "predictive_mean": predictive_mean, "labels": lbls}
 
-def validate(model, loader, device_, thresholds=None, logit_adj=None):
-    model.eval()
-    all_p, all_l = [],[]
-    with torch.no_grad():
-        for feats, lbls in tqdm(loader, desc="  Val", leave=False):
-            z_posterior = model(feats.to(device_))
-            probs, _, _ = get_evidential_metrics(z_posterior)
-            all_p.append(probs.cpu().numpy())
-            all_l.append(lbls.numpy())
 
-    P, L = np.vstack(all_p), np.vstack(all_l)
-    if thresholds is None: thresholds = np.full(P.shape[1], 0.5)
-    
-    auc = roc_auc_score(L, P, average="macro")
-    f1 = f1_score(L, (P >= thresholds).astype(int), average="macro")
-    mAP = average_precision_score(L, P, average="macro")
-    return auc, f1, mAP, P, L
+class EvidentialEvaluator:
     """
     Evidential Deep Learning (EDL) Evaluator.
     Ref: Sensoy et al., 'Evidential Deep Learning to Quantify Classification Uncertainty'.
-    
-    Provides single-pass uncertainty estimation by treating model outputs 
-    as parameters of a Dirichlet distribution, capturing 'Lack of Evidence'.
     """
-
     def __init__(self, model, device_):
         self.model = model
         self.device = device_
@@ -92,17 +74,13 @@ def validate(model, loader, device_, thresholds=None, logit_adj=None):
 
     @torch.no_grad()
     def evaluate(self, loader, thresholds=None):
-        """
-        Calculates subjective logic parameters (Evidence, Alpha, S) 
-        directly from the output logits in a single forward pass.
-        """
-        all_probs, all_epistemic, all_lbls = [], [], []
+        all_probs, all_epistemic, all_lbls = [], [],[]
         for feats, lbls in tqdm(loader, desc="  Evidential Inference", leave=False):
             feats = feats.to(self.device)
+            # Model already applies logit prior in eval mode
             logits = self.model(feats)
             if isinstance(logits, tuple): logits = logits[0]
 
-            # Decompose logits into Dirichlet-based probability and Epistemic variance
             prob, epistemic, _ = get_evidential_metrics(logits)
 
             all_probs.append(prob.cpu().numpy())
@@ -136,26 +114,17 @@ def validate(model, loader, device_, thresholds=None, logit_adj=None):
 def validate(model, loader, device_, thresholds=None, logit_adj=None):
     """
     Clinical Validation Engine.
-    Executes a high-fidelity evaluation during the training loop.
-    
-    Returns:
-        - AUC: Predictive ranking quality.
-        - F1: Harmonic mean of precision and recall.
-        - mAP: Area under the Precision-Recall curve (Crucial for long-tail medical labels).
-        - P/L: Raw probabilities and ground truth labels for calibration audits.
     """
     model.eval()
-    all_p, all_l = [], []
+    all_p, all_l = [],[]
     with torch.no_grad():
         for feats, lbls in tqdm(loader, desc="  Val", leave=False):
+            # Model returns z_posterior directly in eval mode
             logits = model(feats.to(device_))
             if isinstance(logits, tuple): logits = logits[0]
 
-            # Add the logit adjustment before metrics!
-            if logit_adj is not None:
-                logits = logits + logit_adj
+            # Note: logit_adj is no longer applied here.
 
-            # Use strict evidential probabilities to mirror real-world inference
             probs, _, _ = get_evidential_metrics(logits)
 
             all_p.append(probs.cpu().numpy())
@@ -171,9 +140,6 @@ def validate(model, loader, device_, thresholds=None, logit_adj=None):
         auc = 0.5
 
     try:
-        # ----------------------------------------------------
-        # mAP (Nature Fix): Critical for rare pathology recall
-        # ----------------------------------------------------
         mAP = average_precision_score(L, P, average="macro")
     except ValueError:
         mAP = 0.0

@@ -95,7 +95,7 @@ def train_single_model(seed, adj_norm_np, train_emb_dataset, train_loader, val_l
             swa_scheduler.step()
 
         eval_m = swa_model if epoch >= CFG["swa_start"] else model
-        v_auc, v_f1, _, _, _ = validate(eval_m, val_loader, DEVICE, logit_adj=logit_adj_vec)
+        v_auc, v_f1, _, _, _ = validate(eval_m, val_loader, DEVICE)
         saved = early(v_auc, eval_m)
 
         swa_t = "[SWA]" if epoch >= CFG["swa_start"] else "     "

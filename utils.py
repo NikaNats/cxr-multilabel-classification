@@ -78,15 +78,12 @@ def ensure_radlex_embeddings(path, pathologies, model_name, device_):
 
     with torch.no_grad():
         inputs = tokenizer(pathologies, padding=True, truncation=True, return_tensors='pt').to(device_)
-        try:
-            # Prefer projected text embeddings if the model supports multi-modal alignment
-            res = model.get_projected_text_embeddings(inputs.input_ids, inputs.attention_mask)
-        except AttributeError:
-            res = model(**inputs).last_hidden_state[:, 0, :]
 
-        if res.shape[1] != target_dim:
-            projector = nn.Linear(res.shape[1], target_dim).to(device_)
-            res = projector(res)
+        # Read base transformer representation (Last Hidden State)
+        outputs = model(**inputs)
+
+        # CLS token collects full semantic meaning (Shape: [N, 768])
+        res = outputs.last_hidden_state[:, 0, :]
 
     final_res = res.detach().cpu()
     torch.save(final_res, path)
