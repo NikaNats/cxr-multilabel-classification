@@ -67,11 +67,12 @@ def main():
     # PHASE 3: METRICS & CONFORMAL
     # =======================================================
     print("[*] Optimizing Class Thresholds on Validation Set...")
-    _, _, _, val_probs, val_labels = validate(pro_model, eval_val_loader, DEVICE)
+    _, _, _, val_probs, val_labels, _ = validate(pro_model, eval_val_loader, DEVICE)
     opt_thresholds = optimise_thresholds(val_probs, val_labels)
 
     print("[*] Single Model Baseline Evaluation...")
-    base_auc, base_f1, _, base_preds, base_labels = validate(pro_model, eval_test_loader, DEVICE)
+    base_auc, base_f1, _, base_preds, base_labels, _ = validate(pro_model, eval_test_loader, DEVICE)
+
 
     print("[*] Bayesian Ensemble Evaluation (TTA + MC-Dropout)...")
     from evaluators import DeepEnsembleTTAEvaluator
@@ -97,6 +98,26 @@ def main():
     per_class_cov = ((test_pred_sets & test_true).sum(axis=0) / np.maximum(test_true.sum(axis=0), 1))
     marginal_cov = per_class_cov.mean()
     avg_size = test_pred_sets.sum(axis=1).mean()
+
+    print("\n[*] PATHOLOGY PERFORMANCE REPORT (Detailed Audit):")
+    print("-" * 65)
+    print(f"{'Pathology':<25} | {'AUC':<10} | {'Threshold':<10}")
+    print("-" * 65)
+
+    # გამოვიყენოთ ადრე შენახული class_names
+    from utils import CHESTMNIST_CLASS_NAMES
+    for i, name in enumerate(CHESTMNIST_CLASS_NAMES):
+        # ვივარაუდოთ რომ ensemble_results-ში გვაქვს per_class_auc
+        # თუ არა, გამოვთვალოთ test_preds-დან
+        c_auc = roc_auc_score(test_labels[:, i], test_preds[:, i])
+        print(f"{name:<25} | {c_auc:.4f}     | {opt_thresholds[i]:.4f}")
+
+    # ეპისტემური გაურკვევლობის ანალიზი
+    mean_uncertainty = ensemble_results.get('epistemic_variance', np.zeros(1)).mean()
+    print("-" * 65)
+    print(f"Mean Predictive Uncertainty (Epistemic): {mean_uncertainty:.6f}")
+    print("-" * 65)
+
 
     results_df = pd.DataFrame({
         "Metric":["AUC", "AUC 95% CI", "ΔAUC p-value", "Macro F1", "Mean ECE", "Conformal Coverage", "Set Size"],

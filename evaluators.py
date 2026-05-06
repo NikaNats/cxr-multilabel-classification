@@ -48,9 +48,10 @@ class DeepEnsembleTTAEvaluator:
             all_preds.append(np.stack(batch_model_means, axis=0))
             all_lbls.append(lbls.numpy())
 
-        ens = np.concatenate(all_preds, axis=1) 
+        ens = np.concatenate(all_preds, axis=1)
         lbls = np.concatenate(all_lbls, axis=0)
-        predictive_mean = ens.mean(axis=0)  
+        predictive_mean = ens.mean(axis=0)
+        predictive_variance = ens.var(axis=0).mean(axis=1)
 
         if thresholds is None: thresholds = np.full(lbls.shape[1], 0.5)
         preds_binary = (predictive_mean >= thresholds).astype(int)
@@ -59,8 +60,14 @@ class DeepEnsembleTTAEvaluator:
         f1 = f1_score(lbls, preds_binary, average="macro")
         ece = expected_calibration_error(predictive_mean, lbls)
 
-        return {"auc": auc, "f1": f1, "per_class_ece": ece, "predictive_mean": predictive_mean, "labels": lbls}
-
+        return {
+            "auc": auc, 
+            "f1": f1, 
+            "per_class_ece": ece, 
+            "predictive_mean": predictive_mean, 
+            "labels": lbls,
+            "epistemic_variance": predictive_variance # დაამატეთ ეს ხაზი
+        }
 
 class EvidentialEvaluator:
     """
@@ -111,39 +118,30 @@ class EvidentialEvaluator:
         }
 
 
-def validate(model, loader, device_, thresholds=None, logit_adj=None):
-    """
-    Clinical Validation Engine.
-    """
+def validate(model, loader, device_, thresholds=None):
     model.eval()
-    all_p, all_l = [],[]
+    all_p, all_l = [], []
     with torch.no_grad():
         for feats, lbls in tqdm(loader, desc="  Val", leave=False):
-            # Model returns z_posterior directly in eval mode
             logits = model(feats.to(device_))
             if isinstance(logits, tuple): logits = logits[0]
-
-            # Note: logit_adj is no longer applied here.
-
             probs, _, _ = get_evidential_metrics(logits)
-
             all_p.append(probs.cpu().numpy())
             all_l.append(lbls.numpy())
 
     P, L = np.vstack(all_p), np.vstack(all_l)
-
-    if thresholds is None: thresholds = np.full(P.shape[1], 0.5)
-
-    try:
-        auc = roc_auc_score(L, P, average="macro")
-    except ValueError:
-        auc = 0.5
-
-    try:
-        mAP = average_precision_score(L, P, average="macro")
-    except ValueError:
-        mAP = 0.0
-
-    f1 = f1_score(L, (P >= thresholds).astype(int), average="macro")
-
-    return auc, f1, mAP, P, L
+    n_cls = P.shape[1]
+    
+    # გამოთვალეთ ინდივიდუალური AUC-ები
+    class_aucs = []
+    for i in range(n_cls):
+        try:
+            class_aucs.append(roc_auc_score(L[:, i], P[:, i]))
+        except:
+            class_aucs.append(0.5)
+            
+    macro_auc = np.mean(class_aucs)
+    f1 = f1_score(L, (P >= (thresholds if thresholds is not None else 0.5)).astype(int), average="macro")
+    mAP = average_precision_score(L, P, average="macro")
+    
+    return macro_auc, f1, mAP, P, L, class_aucs # დავამატეთ class_aucs

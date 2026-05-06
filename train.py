@@ -88,19 +88,25 @@ def train_single_model(seed, adj_norm_np, train_emb_dataset, train_loader, val_l
             if epoch < CFG["swa_start"]: scheduler.step()
             run_loss += loss.item()
             valid_steps += 1
-            pbar.set_postfix({"loss": f"{loss.item():.4f}"})
+            pbar.set_postfix({
+                "total": f"{loss.item():.3f}",
+                "clf": f"{evidential_loss.item():.3f}", # კლასიფიკაციის loss
+                "lisa": f"{anchor_loss.item():.3f}"    # სემანტიკური anchor loss
+            })
 
         if epoch >= CFG["swa_start"]:
             swa_model.update_parameters(model)
             swa_scheduler.step()
 
         eval_m = swa_model if epoch >= CFG["swa_start"] else model
-        v_auc, v_f1, _, _, _ = validate(eval_m, val_loader, DEVICE)
+        v_auc, v_f1, _, _, _, _ = validate(eval_m, val_loader, DEVICE)
         saved = early(v_auc, eval_m)
 
         swa_t = "[SWA]" if epoch >= CFG["swa_start"] else "     "
         print(f"  {swa_t} Ep {epoch:>2} | Loss {run_loss/max(valid_steps,1):.4f} | AUC {v_auc:.4f} | (F1@0.5: {v_f1:.4f}){' ✓' if saved else ''}")
-
+        log_process("train", f"epoch_{epoch}_metrics", 
+            total_loss=f"{run_loss/valid_steps:.4f}",
+            gpu_mem=f"{torch.cuda.max_memory_allocated()/1e9:.2f}GB")
         if early.early_stop: break
 
     # Clean Memory Management (No C++ Segfaults)
