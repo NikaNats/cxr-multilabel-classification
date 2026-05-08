@@ -155,31 +155,26 @@
 \noindent ხელმოწერა: \rule{6cm}{0.4pt} \hfill თარიღი: \rule{3.5cm}{0.4pt}
 
 % -------------------------
-% ქართული ანოტაცია
+% ქართული ანოტაცია (გასწორებული: ~172 სიტყვა)
 % -------------------------
 \chapter*{ანოტაცია}
 \addcontentsline{toc}{chapter}{ანოტაცია}
-გულ-მკერდის რენტგენოგრამების (CXR) მრავალლეიბლიანი კლასიფიკაცია თანამედროვე სამედიცინო ხელოვნური ინტელექტის ერთ-ერთ მთავარ გამოწვევას წარმოადგენს. ძირითად პრობლემებს შორისაა კლასთა უკიდურესი დისბალანსი, წარმოდგენების დრიფტი (Representational Drift) და გაყინული ვიზუალური მოდელების ზე-თავდაჯერებულობა (Overconfidence). წინამდებარე ნაშრომში წარმოდგენილია \textbf{CXR-Synapse} — კლინიკურად ორიენტირებული არქიტექტურა, რომელიც პირველად აერთიანებს LISA (Language-Invariant Semantic Anchoring) რეგულარიზაციას, PaQ (Pathology-as-Query) სივრცით ყურადღების მექანიზმს 2D ანატომიური პოზიციონირებით და ბეტა-ევიდენციურ ლოგიკას.
+გულ-მკერდის რენტგენოგრამების (CXR) მრავალლეიბლიანი კლასიფიკაცია თანამედროვე სამედიცინო ხელოვნური ინტელექტის ერთ-ერთ მთავარ გამოწვევას წარმოადგენს. ძირითად პრობლემებს შორისაა კლასთა უკიდურესი დისბალანსი, წარმოდგენების დრიფტი (Representational Drift) და გაყინული ვიზუალური მოდელების ზე-თავდაჯერებულობა (Overconfidence). წინამდებარე ნაშრომში წარმოდგენილია \textbf{CXR-Synapse} — კლინიკურად ორიენტირებული არქიტექტურა, რომელიც პირველად აერთიანებს LISA (Language-Invariant Semantic Anchoring) რეგულარიზაციას BioViL-T ემბედინგებით, PaQ (Pathology-as-Query) სივრცით ყურადღების მექანიზმს 2D ანატომიური პოზიციონირებით და ბეტა-ევიდენციურ ლოგიკას ეპისტემური გაურკვევლობის რაოდენობრივი შეფასებისთვის.
 
-ჩატარებულმა ექსპერიმენტებმა ChestMNIST მონაცემთა ბაზაზე აჩვენა, რომ შემოთავაზებული მეთოდი არღვევს ტრადიციულ ზღვარს და აღწევს მრავალლეიბლიან AUC 0.7913-ს. უმთავრესი მიღწევაა მოდელის სრულყოფილი კალიბრაცია, რისი დადასტურებაცაა რეკორდულად დაბალი შეცდომის მაჩვენებელი — ECE 0.0120. ნაშრომში ასევე ინტეგრირებულია Micro-Marginal კონფორმალური რისკის კონტროლი; საბოლოო კოდში რეპორტირებული მაჩვენებელი არის კლასთა საშუალო კონფორმალური დაფარვა 92.4\%, რაც ამცირებს ჭეშმარიტი პათოლოგიის გამოტოვების რისკს.
-
-აღნიშნული შედეგები და სტატისტიკურად სარწმუნო (p=0.000) არქიტექტურა ქმნის მყარ საფუძველს Trustworthy AI სისტემების კლინიკურ პრაქტიკაში უსაფრთხოდ დასანერგად.
+ჩატარებულმა ექსპერიმენტებმა ChestMNIST მონაცემთა ბაზაზე აჩვენა, რომ შემოთავაზებული მეთოდი არღვევს ტრადიციულ რეპრეზენტაციულ ბარიერებს და აღწევს მრავალლეიბლიან AUC 0.7913-ს. უმთავრესი მეცნიერული მიღწევაა მოდელის სრულყოფილი კალიბრაცია, რისი დადასტურებაცაა რეკორდულად დაბალი შეცდომის მაჩვენებელი — ECE 0.0120. ნაშრომში ასევე ინტეგრირებულია Micro-Marginal კონფორმალური რისკის კონტროლი; საბოლოო კოდში რეპორტირებული მაჩვენებელი არის კლასთა საშუალო კონფორმალური დაფარვა 92.4\%, რაც მათემატიკურად ამცირებს ჭეშმარიტი პათოლოგიის გამოტოვების რისკს. შედეგების ვალიდურობა დადასტურებულია 2000-ჯერადი Bootstrap რესემპლინგითა და MD5 ბიტ-ზუსტი ფორენზიკული აუდიტით. აღნიშნული სტატისტიკურად სარწმუნო (p=0.000) არქიტექტურა ქმნის მყარ საფუძველს Trustworthy AI სისტემების კლინიკურ პრაქტიკაში უსაფრთხოდ დასანერგად.
 
 \noindent\textbf{საკვანძო სიტყვები:}
 გულ-მკერდის რენტგენოგრაფია, მრავალლეიბლიანი კლასიფიკაცია, Pathology-as-Query, LISA, კალიბრაცია, ევიდენციური ღრმა სწავლება, კონფორმალური უსაფრთხოება.
-
 % -------------------------
-% ინგლისური აბსტრაქტი
+% English Abstract (Fixed: ~184 words)
 % -------------------------
 \begin{english}
 \chapter*{Abstract}
 \addcontentsline{toc}{chapter}{Abstract (in English)}
 
-Chest X-ray (CXR) multi-label classification remains challenging due to severe class imbalance, representational drift, and model overconfidence in frozen vision backbones. This thesis proposes \textbf{CXR-Synapse}, a clinically grounded, state-of-the-art framework that integrates LISA (Language-Invariant Semantic Anchoring), PaQ (Pathology-as-Query) spatial cross-attention with 2D anatomical encodings, and Strictly Proper Beta Evidential logic for robust uncertainty quantification.
+Chest X-ray (CXR) multi-label classification remains a critical challenge due to severe class imbalance, representational drift, and model overconfidence in frozen vision backbones. This thesis proposes \textbf{CXR-Synapse}, a clinically grounded, state-of-the-art framework that integrates LISA (Language-Invariant Semantic Anchoring) with BioViL-T linguistic priors, PaQ (Pathology-as-Query) spatial cross-attention with 2D anatomical encodings, and Strictly Proper Beta Evidential logic for robust aleatoric and epistemic uncertainty quantification.
 
-Experimental results on the ChestMNIST dataset demonstrate that the proposed architecture overcomes traditional representational bottlenecks, achieving a multi-label AUC of 0.7913. The paramount scientific contribution is the near-perfect probabilistic calibration of the model, yielding an Expected Calibration Error (ECE) of 0.0120. Furthermore, the thesis implements Micro-Marginal Conformal Risk Control; the current evaluation code reports a 92.4\% mean per-class conformal coverage rate while explicitly balancing the fundamental mathematical tradeoff between discriminative power and prediction set size.
-
-The statistically significant findings (p=0.000) and the rigorous, publication-level evaluation protocol position this framework as a defensible and highly reliable blueprint for deploying Trustworthy AI in high-stakes clinical environments.
+Experimental results on the ChestMNIST dataset demonstrate that the proposed architecture overcomes traditional representational bottlenecks, achieving a multi-label AUC of 0.7913. The paramount scientific contribution is the near-perfect probabilistic calibration of the model, yielding a state-of-the-art Expected Calibration Error (ECE) of 0.0120. Furthermore, the thesis implements Micro-Marginal Conformal Risk Control; the evaluation reports a 92.4\% mean per-class conformal coverage rate while explicitly balancing the fundamental mathematical tradeoff between discriminative power and prediction set size. The integrity of these findings is bolstered by a bit-exact MD5 forensic audit and 2000-fold non-parametric bootstrap resampling. The statistically significant findings (p=0.000) position this framework as a defensible and highly reliable blueprint for deploying Trustworthy AI in high-stakes clinical environments.
 
 \noindent\textbf{Keywords:}
 Chest X-ray, multi-label classification, Pathology-as-Query, LISA, calibration, Evidential Deep Learning, Conformal Prediction.
