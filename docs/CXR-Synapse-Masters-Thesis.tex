@@ -40,6 +40,8 @@
 \usepackage{caption}
 \usepackage{subcaption}
 \usepackage{hyperref}
+\usepackage{xurl}
+\Urlmuskip=0mu plus 1mu
 \usepackage{fancyhdr}
 \usepackage{titlesec}
 
@@ -981,7 +983,7 @@ Evaluation ფაზა მკაცრად გამიჯნულია ს
 \chapter*{დანართი №1: სამაგისტრო ნაშრომის მოცულობა და სტრუქტურა}
 \addcontentsline{toc}{chapter}{დანართი №1: სამაგისტრო ნაშრომის მოცულობა და სტრუქტურა}
 \begin{center}
-\begin{tabular}{p{0.30\textwidth}p{0.20\textwidth}p{0.45\textwidth}}
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.28\textwidth}>{\raggedright\arraybackslash}p{0.16\textwidth}>{\raggedright\arraybackslash}p{0.50\textwidth}}
 \toprule
 \textbf{მოთხოვნის კატეგორია} & \textbf{სტატუსი} & \textbf{მტკიცებულება ნაშრომში} \\
 \midrule
@@ -1003,7 +1005,7 @@ Evaluation ფაზა მკაცრად გამიჯნულია ს
 \chapter*{დანართი №2: სამაგისტრო ნაშრომის ფორმატირების შესაბამისობა}
 \addcontentsline{toc}{chapter}{დანართი №2: სამაგისტრო ნაშრომის ფორმატირების შესაბამისობა}
 \begin{center}
-\begin{tabular}{p{0.35\textwidth}p{0.20\textwidth}p{0.40\textwidth}}
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.33\textwidth}>{\raggedright\arraybackslash}p{0.16\textwidth}>{\raggedright\arraybackslash}p{0.45\textwidth}}
 \toprule
 \textbf{ფორმალური ელემენტი} & \textbf{სტატუსი} & \textbf{იმპლემენტაცია} \\
 \midrule
@@ -1012,7 +1014,7 @@ Evaluation ფაზა მკაცრად გამიჯნულია ს
 ძირითადი შრიფტი & კი & Sylfaen, ზომა 12. \\
 ხაზთაშორისი დაშორება & კი & 1.5 ინტერვალი (\texttt{\textbackslash setstretch\{1.5\}}). \\
 გვერდების ნუმერაცია & კი & შესავალიდან: არაბული ნუმერაცია. \\
-თავებისა და სექციების სტილი & კი & სათაურები: 16pt (bold), სექციები: 14pt (bold). \\
+თავებისა და სექციების სტილი & კი & სათაურები: 16pt (bold), \\ სექციები: 14pt (bold). \\
 ციტირების სტანდარტი & კი & სქოლიოები (Footnotes) და BibTeX ბიბლიოგრაფია. \\
 \bottomrule
 \end{tabular}
@@ -1023,15 +1025,15 @@ Evaluation ფაზა მკაცრად გამიჯნულია ს
 \begin{table}[H]
 \centering
 \caption{კვლევის განხორციელების ქრონოლოგია.}
-\begin{tabular}{p{0.08\textwidth}p{0.32\textwidth}p{0.20\textwidth}p{0.30\textwidth}}
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.08\textwidth}>{\raggedright\arraybackslash}p{0.30\textwidth}>{\raggedright\arraybackslash}p{0.18\textwidth}>{\raggedright\arraybackslash}p{0.32\textwidth}}
 \toprule
 \textbf{№} & \textbf{ეტაპი} & \textbf{ვადები} & \textbf{შედეგი (Deliverable)} \\
 \midrule
 1 & თემის ფინალიზაცია და მოდელირება & კვირა 1--2 & დამტკიცებული გეგმა \\
 2 & ლიტე\-რა\-ტურის SOTA ანალიზი & კვირა 3--4 & თავი 1-2-ის მონახაზი \\
-3 & ELIXR-C ექსტრაქცია და აუდიტი & კვირა 5--6 & ექსპერიმენტული ემბედინგები \\
-4 & LISA/PaQ სწავლება და აბლაცია & კვირა 7--10 & მოდელის ჩეკპოინტები და ლოგები \\
-5 & სტატისტიკური ვალიდაცია & კვირა 11--12 & ფინალური ცხრილები და ECE plots \\
+3 & ELIXR-C ექსტრაქცია და \\ აუდიტი & კვირა 5--6 & ექსპერიმენტული ემბედინგები \\
+4 & LISA/PaQ სწავლება და \\ აბლაცია & კვირა 7--10 & მოდელის ჩეკპოინტები \\ და ლოგები \\
+5 & სტატისტიკური ვალიდაცია & კვირა 11--12 & ფინალური ცხრილები \\ და ECE plots \\
 6 & ნაშრომის გაფორმება და დაცვა & კვირა 13--14 & დასრულებული ნაშრომი \\
 \bottomrule
 \end{tabular}
@@ -1042,7 +1044,7 @@ Evaluation ფაზა მკაცრად გამიჯნულია ს
 \begin{center}
 \begin{tabular}{>{\raggedright\arraybackslash}p{0.52\textwidth}c>{\raggedright\arraybackslash}p{0.18\textwidth}}
 \toprule
-\textbf{შეფასების კრიტერიუმი} & \textbf{მაქს. ქულა} & \textbf{მინიჭებული ქულა} \\
+\textbf{შეფასების კრიტერიუმი} & \textbf{მაქს. ქულა} & \textbf{მინიჭებული\\ქულა} \\
 \midrule
 პრობლემის აქტუალობა და ფორმულირება & 10 &  \\
 მეთოდოლოგიის ადეკვატურობა (LISA/PaQ) & 20 &  \\
@@ -1055,7 +1057,8 @@ Evaluation ფაზა მკაცრად გამიჯნულია ს
 \bottomrule
 \end{tabular}
 \end{center}
-\noindent ხელმძღვანელის კომენტარი: \hrulefill \\
+\noindent ხელმძღვანელის კომენტარი:\\
+\hrulefill \\
 \vspace{0.8cm}
 \noindent ხელმოწერა: \rule{5cm}{0.4pt}\hfill თარიღი: \rule{3cm}{0.4pt}
 
@@ -1064,20 +1067,21 @@ Evaluation ფაზა მკაცრად გამიჯნულია ს
 \begin{center}
 \begin{tabular}{>{\raggedright\arraybackslash}p{0.52\textwidth}c>{\raggedright\arraybackslash}p{0.18\textwidth}}
 \toprule
-\textbf{შეფასების კრიტერიუმი} & \textbf{მაქს. ქულა} & \textbf{მინიჭებული ქულა} \\
+\textbf{შეფასების კრიტერიუმი} & \textbf{მაქს. ქულა} & \textbf{მინიჭებული\\ქულა} \\
 \midrule
 კვლევითი პრობლემის სიახლე & 15 &  \\
 ლიტერატურის კრიტიკული სინთეზი & 15 &  \\
 მეთოდოლოგიური სიზუსტე და ვალიდობა & 20 &  \\
 შედეგების ხარისხი და სტატისტიკური მტკიცებულება & 20 &  \\
 დისკუსიის ხარისხი და შეზღუდვების გააზრება & 15 &  \\
-პრაქტიკული ღირებულება და სამომავლო ხედვა & 15 &  \\
+პრაქტიკული ღირებულება \\ და სამომავლო ხედვა & 15 &  \\
 \midrule
 \textbf{ჯამური ქულა} & \textbf{100} &  \\
 \bottomrule
 \end{tabular}
 \end{center}
-\noindent რეცენზენტის რეკომენდაცია: \hrulefill \\
+\noindent რეცენზენტის რეკომენდაცია:\\
+\hrulefill \\
 \vspace{0.8cm}
 \noindent ხელმოწერა: \rule{5cm}{0.4pt}\hfill თარიღი: \rule{3cm}{0.4pt}
 
@@ -1096,7 +1100,8 @@ Evaluation ფაზა მკაცრად გამიჯნულია ს
 \bottomrule
 \end{tabular}
 \end{center}
-\noindent კომისიის საბოლოო გადაწყვეტილება: \hrulefill \\
+\noindent კომისიის საბოლოო გადაწყვეტილება:\\
+\hrulefill \\
 \vspace{0.8cm}
 \noindent კომისიის თავმჯდომარის ხელმოწერა: \rule{5cm}{0.4pt}\hfill თარიღი: \rule{3cm}{0.4pt}% ========================================
 % რეპროდუცირებადობის და ეთიკის სექცია
@@ -1112,7 +1117,7 @@ Evaluation ფაზა მკაცრად გამიჯნულია ს
 \begin{enumerate}[leftmargin=1.6em]
     \item \textbf{ნაშრომის სრული ტექსტი}: საბოლოო ვერსია PDF ფორმატში.
     \item \textbf{პროგრამული კოდი}: სრული რეპოზიტორიის სნეპშოტი და Git-commit იდენტიფიკატორი.
-    \item \textbf{სამუშაო გარემო}: ბიბლიოთეკების ვერსიების კონფიგურაციის ფაილი (\texttt{requirements.txt}).
+    \item \textbf{სამუშაო გარემო}: ბიბლიოთეკების ვერსიების \\ კონფიგურაციის ფაილი (\texttt{requirements.txt}).
     \item \textbf{მონაცემთა მანიფესტი}: ChestMNIST-ის 10\%-იანი დეცილისა და Train/Val/Test გაყოფის MD5 ჰეშ-ლოგები.
     \item \textbf{მოდელის წონები}: სამივე დამოუკიდებელი Seed-ის (42, 43, 44) ფინალური ჩეკპოინტები (.pth).
     \item \textbf{ნედლი პროგნოზები}: სატესტო ნაკრების ალბათობების მასივები (NPY), რაც საჭიროა ბუტსტრაპ-ანალიზისთვის.
@@ -1133,7 +1138,11 @@ Evaluation ფაზა მკაცრად გამიჯნულია ს
 
 \nocite{*}
 \addcontentsline{toc}{chapter}{ბიბლიოგრაფია}
+\begingroup
+\sloppy
+\setlength{\emergencystretch}{2em}
 \bibliographystyle{plain}
 \bibliography{CXR-Synapse-Masters-Thesis}
+\endgroup
 
 \end{document}
