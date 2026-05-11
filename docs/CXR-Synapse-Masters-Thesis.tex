@@ -39,6 +39,7 @@
 \usepackage{float}
 \usepackage{caption}
 \usepackage{subcaption}
+\usepackage{ragged2e}
 \usepackage{hyperref}
 \usepackage{xurl}
 \Urlmuskip=0mu plus 1mu
@@ -60,7 +61,7 @@
 \setstretch{1.5} % 1.5 ხაზთაშორისი დაშორება
 \setlength{\parindent}{1.2em}
 \setlength{\parskip}{0.2em}
-\emergencystretch=5em
+\emergencystretch=1.5em
 \tolerance=2000
 \hyphenpenalty=500
 \sloppy
@@ -186,7 +187,10 @@ Chest X-ray, multi-label classification, Pathology-as-Query, LISA, calibration, 
 % -------------------------
 % სარჩევი, ფიგურები, ცხრილები
 % -------------------------
+\begingroup
+\sloppy
 \tableofcontents
+\endgroup
 \clearpage
 \pagenumbering{arabic}
 \setcounter{page}{1}
@@ -967,6 +971,7 @@ Evaluation ფაზა მკაცრად გამიჯნულია ს
 
 დასკვნის სახით შეიძლება ითქვას, რომ შეთავაზებული მეთოდი წარმოადგენს მაღალი სანდოობის კვლევით ჩარჩოს, რომელიც ამტკიცებს, რომ კლინიკური ცოდნისა და მათემატიკური გაურკვევლობის ინტეგრაცია არის ერთადერთი გზა უსაფრთხო სამედიცინო ხელოვნური ინტელექტის შესაქმნელად. სამომავლო მუშაობა მიმართული იქნება ვიზუალური ბექბოუნის DoRA (Weight-Decomposed Low-Rank Adaptation) მეთოდით ფინ-ტიუნინგზე, რათა ოპტიმიზდეს პროგნოზების სიმრავლის ზომა პაციენტის უსაფრთხოების გარანტიების დაუზიანებლად.
 \appendix
+\begin{sloppypar}
 \chapter{დანართი №1: პროგრამული არქიტექტურის მატრიცა}
 \begin{center}
 \begin{tabular}{>{\raggedright\arraybackslash}p{0.32\textwidth}>{\raggedright\arraybackslash}p{0.62\textwidth}}
@@ -1012,12 +1017,14 @@ Evaluation ფაზა მკაცრად გამიჯნულია ს
     \item **Domain Constraint**: მოდელის მიერ მიღწეული ECE 0.0120 ვალიდურია მხოლოდ ChestMNIST მონაცემთა განაწილების ფარგლებში. სისტემის სხვა საავადმყოფოში დანერგვა მოითხოვს წინასწარ **პროსპექტულ ვალიდაციას** და ადგილობრივ კალიბრაციას.
     \item **Bias Awareness**: მონაცემთა ბაზის სპეციფიკიდან გამომდინარე, სისტემა შეიძლება შეიცავდეს ფარულ დემოგრაფიულ მიკერძოებას. კლინიკურ გამოყენებამდე სავალდებულოა მრავალმხრივი **Fairness Audit**-ის ჩატარება.
 \end{itemize}
+\end{sloppypar}
 \vspace{1cm}
 \noindent \textit{შენიშვნა: ნებისმიერი სამედიცინო AI-ს დანერგვა უნდა მოხდეს "Software as a Medical Device" (SaMD) საერთაშორისო რეგულაციებისა და ადგილობრივი კანონმდებლობის შესაბამისად.}
 % ========================================
 % დანართების სექცია (სეუ-ს რეგულაციების მიხედვით)
 % ========================================
 
+\begin{sloppypar}
 \chapter*{დანართი №1: სამაგისტრო ნაშრომის მოცულობა და სტრუქტურა}
 \addcontentsline{toc}{chapter}{დანართი №1: სამაგისტრო ნაშრომის მოცულობა და სტრუქტურა}
 \begin{center}
@@ -1080,9 +1087,9 @@ Evaluation ფაზა მკაცრად გამიჯნულია ს
 \chapter*{დანართი №4: ხელმძღვანელის შეფასების უწყისი (შაბლონი)}
 \addcontentsline{toc}{chapter}{დანართი №4: ხელმძღვანელის შეფასების უწყისი}
 \begin{center}
-\begin{tabular}{>{\raggedright\arraybackslash}p{0.52\textwidth}c>{\raggedright\arraybackslash}p{0.18\textwidth}}
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.52\textwidth}>{\centering\arraybackslash}p{0.18\textwidth}>{\raggedright\arraybackslash}p{0.18\textwidth}}
 \toprule
-\textbf{შეფასების კრიტერიუმი} & \textbf{მაქს. ქულა} & \textbf{მინიჭებული\\ქულა} \\
+\textbf{შეფასების კრიტერიუმი} & \textbf{მაქს. ქულა} & \textbf{მინიჭებული ქულა} \\
 \midrule
 პრობლემის აქტუალობა და ფორმულირება & 10 &  \\
 მეთოდოლოგიის ადეკვატურობა (LISA/PaQ) & 20 &  \\
@@ -1103,16 +1110,16 @@ Evaluation ფაზა მკაცრად გამიჯნულია ს
 \chapter*{დანართი №5: რეცენზენტის შეფასების უწყისი (შაბლონი)}
 \addcontentsline{toc}{chapter}{დანართი №5: რეცენზენტის შეფასების უწყისი}
 \begin{center}
-\begin{tabular}{>{\raggedright\arraybackslash}p{0.52\textwidth}c>{\raggedright\arraybackslash}p{0.18\textwidth}}
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.52\textwidth}>{\centering\arraybackslash}p{0.18\textwidth}>{\centering\arraybackslash}p{0.18\textwidth}}
 \toprule
-\textbf{შეფასების კრიტერიუმი} & \textbf{მაქს. ქულა} & \textbf{მინიჭებული\\ქულა} \\
+\textbf{შეფასების კრიტერიუმი} & \textbf{მაქს. ქულა} & \textbf{მინიჭებული ქულა} \\
 \midrule
 კვლევითი პრობლემის სიახლე & 15 &  \\
 ლიტერატურის კრიტიკული სინთეზი & 15 &  \\
 მეთოდოლოგიური სიზუსტე და ვალიდობა & 20 &  \\
 შედეგების ხარისხი და სტატისტიკური მტკიცებულება & 20 &  \\
 დისკუსიის ხარისხი და შეზღუდვების გააზრება & 15 &  \\
-პრაქტიკული ღირებულება \\ და სამომავლო ხედვა & 15 &  \\
+პრაქტიკული ღირებულება და სამომავლო ხედვა & 15 &  \\
 \midrule
 \textbf{ჯამური ქულა} & \textbf{100} &  \\
 \bottomrule
@@ -1141,7 +1148,8 @@ Evaluation ფაზა მკაცრად გამიჯნულია ს
 \noindent კომისიის საბოლოო გადაწყვეტილება:\\
 \hrulefill \\
 \vspace{0.8cm}
-\noindent კომისიის თავმჯდომარის ხელმოწერა: \rule{5cm}{0.4pt}\hfill თარიღი: \rule{3cm}{0.4pt}% ========================================
+\noindent კომისიის თავმჯდომარის ხელმოწერა: \rule{5cm}{0.4pt}\hfill თარიღი: \rule{3cm}{0.4pt}
+\end{sloppypar}% ========================================
 % რეპროდუცირებადობის და ეთიკის სექცია
 % ========================================
 % ========================================
@@ -1177,6 +1185,7 @@ Evaluation ფაზა მკაცრად გამიჯნულია ს
 \nocite{*}
 \addcontentsline{toc}{chapter}{ბიბლიოგრაფია}
 \begingroup
+\RaggedRight
 \sloppy
 \setlength{\emergencystretch}{2em}
 \bibliographystyle{plain}
