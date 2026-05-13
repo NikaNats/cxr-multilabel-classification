@@ -1065,12 +1065,14 @@ Evaluation ფაზა მკაცრად გამიჯნულია ს
 \chapter*{დანართი №2: სამაგისტრო ნაშრომის ფორმატირების შესაბამისობა}
 \addcontentsline{toc}{chapter}{დანართი №2: სამაგისტრო ნაშრომის ფორმატირების შესაბამისობა}
 
-\vspace{-0.8cm}
+\vspace{-0.6cm}
 \noindent
 \begingroup
 \small
 \centering
-\begin{tabular}{>{\raggedright\arraybackslash}p{0.33\textwidth}>{\raggedright\arraybackslash}p{0.16\textwidth}>{\raggedright\arraybackslash}p{0.45\textwidth}}
+% ეს ბრძანება მატებს სიმაღლეს უჯრებს, რომ ტექსტი ხაზებს არ მიეწებოს
+\renewcommand{\arraystretch}{1.6} 
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.36\textwidth} >{\centering\arraybackslash}p{0.10\textwidth} >{\raggedright\arraybackslash}p{0.46\textwidth}}
 \toprule
 \textbf{ფორმალური ელემენტი} & \textbf{სტატუსი} & \textbf{იმპლემენტაცია} \\
 \midrule
@@ -1079,7 +1081,7 @@ Evaluation ფაზა მკაცრად გამიჯნულია ს
 ძირითადი შრიფტი & კი & Sylfaen, ზომა 12. \\
 ხაზთაშორისი დაშორება & კი & 1.5 ინტერვალი (\texttt{\textbackslash setstretch\{1.5\}}). \\
 გვერდების ნუმერაცია & კი & შესავალიდან: არაბული ნუმერაცია. \\
-თავებისა და სექციების სტილი & კი & სათაურები: 16pt (bold), \\ სექციები: 14pt (bold). \\
+თავებისა და სექციების სტილი & კი & სათაურები: 16pt (bold), \newline სექციები: 14pt (bold). \\
 ციტირების სტანდარტი & კი & სქოლიოები (Footnotes) და BibTeX ბიბლიოგრაფია. \\
 \bottomrule
 \end{tabular}
@@ -1163,33 +1165,36 @@ Evaluation ფაზა მკაცრად გამიჯნულია ს
 \vspace{0.8cm}
 \noindent ხელმოწერა: \rule{5cm}{0.4pt}\hfill თარიღი: \rule{3cm}{0.4pt}
 
+\clearpage % აუცილებელია, რომ დანართი ახალი გვერდიდან დაიწყოს
 \chapter*{დანართი №6: დაცვის კომისიის შეფასების უწყისი}
 \addcontentsline{toc}{chapter}{დანართი №6: დაცვის კომისიის შეფასების უწყისი}
 
-\vspace{-0.5cm}
+\vspace{0.2cm} % შევამციროთ ზედა დაშორება
 \begingroup
-\renewcommand{\arraystretch}{1.8} % ზრდის ხაზებს შორის დაშორებას, რომ ქულების დაწერა მოხერხდეს
+\small % ოდნავ დავაპატარავოთ ტექსტი, რომ ყველაფერი ჩაეტიოს
+\renewcommand{\arraystretch}{1.6} % ოპტიმალური სიმაღლე უჯრებისთვის
 \centering
-\begin{tabular}{>{\raggedright\arraybackslash}p{0.55\textwidth} ccc}
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.50\textwidth} >{\centering\arraybackslash}p{1.4cm} >{\centering\arraybackslash}p{1.4cm} >{\centering\arraybackslash}p{1.4cm}}
 \toprule
 \textbf{შეფასების კომპონენტი} & \textbf{წევრი 1} & \textbf{წევრი 2} & \textbf{წევრი 3} \\
 \midrule
-ნაშრომის ხარისხი (შინაარსი და მეთოდოლოგია) & \rule{1.2cm}{0pt} & \rule{1.2cm}{0pt} & \rule{1.2cm}{0pt} \\
-პრეზენტაციის ხარისხი და ვიზუალიზაცია & & & \\
-დისკუსია და კითხვებზე პასუხის გაცემა & & & \\
+ნაშრომის ხარისხი (შინაარსი და მეთოდოლოგია) & \rule{1cm}{0.4pt} & \rule{1cm}{0.4pt} & \rule{1cm}{0.4pt} \\
+პრეზენტაციის ხარისხი და ვიზუალიზაცია & \rule{1cm}{0.4pt} & \rule{1cm}{0.4pt} & \rule{1cm}{0.4pt} \\
+დისკუსია და კითხვებზე პასუხის გაცემა & \rule{1cm}{0.4pt} & \rule{1cm}{0.4pt} & \rule{1cm}{0.4pt} \\
 \midrule
-\textbf{ჯამური ქულა (100-ქულიანი შკალა)} & & & \\
+\textbf{ჯამური ქულა (100-ქულიანი შკალა)} & \rule{1cm}{0.4pt} & \rule{1cm}{0.4pt} & \rule{1cm}{0.4pt} \\
 \bottomrule
 \end{tabular}
 \endgroup
 
-\vspace{1.2cm}
-\noindent კომისიის საბოლოო გადაწყვეტილება:\\
-\rule{\textwidth}{0.4pt} \\
-\rule{\textwidth}{0.4pt}
+\vspace{0.8cm}
+\noindent \textbf{კომისიის საბოლოო გადაწყვეტილება:}\\
+\hrulefill \\
+\hrulefill 
 
 \vspace{1.5cm}
-\noindent კომისიის თავმჯდომარის ხელმოწერა: \rule{5.5cm}{0.4pt} \hfill თარიღი: \rule{3.5cm}{0.4pt}
+\noindent % ხელმოწერის ბლოკი
+{\small კომისიის თავმჯდომარის ხელმოწერა: \rule{4.5cm}{0.4pt} \hfill თარიღი: \rule{2.5cm}{0.4pt}}
 \end{sloppypar}% ========================================
 % რეპროდუცირებადობის და ეთიკის სექცია
 % ========================================
