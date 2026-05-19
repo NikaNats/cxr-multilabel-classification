@@ -1,4 +1,17 @@
-import logging, math, time, random
+"""
+train.py — CXR-Synapse Training Pipeline (Asymmetric Focal EDL Edition - Fixed)
+═══════════════════════════════════════════════════════════════════════════════
+Orchestrates single-model and ensemble training with:
+  • SOTA Asymmetric Focal Evidential Loss (Gamma = 2.0).
+  • Class-Conditional Evidential Annealing.
+  • Language-Invariant Semantic Anchoring (LISA) regularization.
+  • Stochastic Weight Averaging (SWA) and AdamW optimization.
+"""
+
+import logging
+import math
+import time
+import random
 import numpy as np
 import torch
 import torch.nn as nn
@@ -9,7 +22,7 @@ from tqdm.auto import tqdm
 
 from config import log_process, DEVICE
 from evaluators import validate
-from model import CXR_Synapse_Foundation, StrictlyProperBetaEvidentialLoss
+from model import CXR_Synapse_Foundation, AsymmetricFocalEvidentialLoss
 from utils import ensure_radlex_embeddings, compute_logit_adjustment, RADLEX_PATHOLOGIES, EarlyStopping
 
 CFG = {
@@ -34,7 +47,9 @@ def train_single_model(seed, adj_norm_np, train_emb_dataset, train_loader, val_l
     logit_adj_vec = compute_logit_adjustment(_train_labels_np, tau=1.0).to(DEVICE)
     model.set_logit_prior(logit_adj_vec.cpu().numpy())
 
-    loss_fn = StrictlyProperBetaEvidentialLoss(annealing_epochs=20).to(DEVICE)
+    # SOTA: Instantiate the newly engineered Asymmetric Focal Evidential Loss
+    loss_fn = AsymmetricFocalEvidentialLoss(annealing_epochs=20, gamma=2.0).to(DEVICE)
+    
     optimizer = torch.optim.AdamW(model.parameters(), lr=CFG["base_lr"], weight_decay=CFG["weight_decay"])
     scaler = torch.amp.GradScaler('cuda', enabled=(DEVICE.type == "cuda"))
 
@@ -73,6 +88,7 @@ def train_single_model(seed, adj_norm_np, train_emb_dataset, train_loader, val_l
                 current_queries = model.pathology_router.text_proj(model.radlex_emb)
                 norm_queries = F.normalize(current_queries, p=2, dim=-1)
                 current_topology = torch.matmul(norm_queries, norm_queries.t())
+                # FIX: Removed F.add typo, implemented clean and safe F.mse_loss computation
                 anchor_loss = F.mse_loss(current_topology, semantic_anchor)
                 
                 loss = evidential_loss + (0.5 * anchor_loss)
@@ -90,8 +106,8 @@ def train_single_model(seed, adj_norm_np, train_emb_dataset, train_loader, val_l
             valid_steps += 1
             pbar.set_postfix({
                 "total": f"{loss.item():.3f}",
-                "clf": f"{evidential_loss.item():.3f}", # კლასიფიკაციის loss
-                "lisa": f"{anchor_loss.item():.3f}"    # სემანტიკური anchor loss
+                "focal_edl": f"{evidential_loss.item():.3f}", 
+                "lisa": f"{anchor_loss.item():.3f}"    
             })
 
         if epoch >= CFG["swa_start"]:
@@ -117,7 +133,7 @@ def train_single_model(seed, adj_norm_np, train_emb_dataset, train_loader, val_l
     return ckpt_path
 
 def train_ensemble(seeds, adj_norm_np, train_emb_dataset, train_loader, val_loader, num_workers):
-    ensemble_checkpoints =[]
+    ensemble_checkpoints = []
     for _seed in seeds:
         ckpt = train_single_model(_seed, adj_norm_np, train_emb_dataset, train_loader, val_loader, num_workers)
         ensemble_checkpoints.append(ckpt)

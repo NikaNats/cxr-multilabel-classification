@@ -1,8 +1,18 @@
+"""
+model.py — CXR-Synapse Foundation Model (SOTA 2026 Edition)
+═══════════════════════════════════════════════════════════════════════════════
+Orchestrates SOTA Deep Evidential Learning with:
+  • 2D Sine-Cosine Positional Encodings (L/R Lung Symmetry).
+  • Pathology-as-Query (PaQ) Graph-Guided Cross-Attention.
+  • Asymmetric Focal Evidential Loss (Targets hard diffuse classes like Infiltration).
+  • Class-Conditional Evidential Annealing (Prevents minority class saturation).
+"""
+
+import math
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import math
 
 # ============================================================
 # SOTA 2024: ANATOMICAL 2D POSITIONAL ENCODING
@@ -23,7 +33,6 @@ def get_2d_sincos_pos_embed(embed_dim, grid_size, temperature=10000.0):
     dim_t = np.arange(embed_dim // 2, dtype=np.float32)
     dim_t = temperature ** (2 * (dim_t // 2) / (embed_dim // 2))
     
-    # CRITICAL FIX: reshape(-1, 1) allows broadcasting (64, 1) / (192,) -> (64, 192)
     pos_h = grid[1].reshape(-1, 1) / dim_t
     pos_w = grid[0].reshape(-1, 1) / dim_t
     
@@ -69,8 +78,7 @@ class PathologyCrossAttention(nn.Module):
         B = patches.shape[0]
         base_queries = self.text_proj(radlex_emb).unsqueeze(0).expand(B, -1, -1)
         
-        # 1. GRAPH MESSAGE PASSING: Utilize the previously "abandoned" adjacency matrix!
-        # This explicitly injects clinical co-occurrence rules (e.g., Pneumonia <-> Infiltration)
+        # 1. GRAPH MESSAGE PASSING: Inject clinical co-occurrence rules (e.g., Pneumonia <-> Infiltration)
         adj_batch = adjacency_mask.unsqueeze(0).expand(B, -1, -1)
         graph_queries = self.graph_proj(torch.bmm(adj_batch, base_queries))
         
@@ -136,15 +144,15 @@ class CXR_Synapse_Foundation(nn.Module):
         z_v, disease_features = self.pathology_router(proj, self.radlex_emb, self.adjacency_mask)
         z_posterior = z_v + self.logit_prior # Intrinsic Logit Prior Fusion
         
-        if self.training:
-            return z_posterior, z_v
-        return z_posterior
+        # SOTA: Always return both to ensure un-decoupled prior-free evaluation
+        return z_posterior, z_v
 
 
 # ============================================================
-# SUBJECTIVE LOGIC & LOSS
+# SUBJECTIVE LOGIC & ADVANCED SOTA LOSS
 # ============================================================
 class StrictlyProperBetaEvidentialLoss(nn.Module):
+    """Legacy strictly proper beta evidential loss (kept for backward compatibility)."""
     def __init__(self, annealing_epochs=20):
         super().__init__()
         self.annealing_epochs = max(int(annealing_epochs), 1)
@@ -159,10 +167,7 @@ class StrictlyProperBetaEvidentialLoss(nn.Module):
                (beta - 1.0) * (torch.digamma(beta) - digamma_ab)
 
     def forward(self, z_posterior, z_v, targets, current_epoch):
-        # Fisher-Consistent Classification Loss
         clf_loss = F.binary_cross_entropy_with_logits(z_posterior, targets)
-
-        # FP16 Safe Evidential Calculation
         z_safe = torch.clamp(z_v, min=-10.0, max=10.0) 
         alpha = torch.exp(z_safe) + 1.0
         beta = torch.exp(-z_safe) + 1.0
@@ -175,6 +180,59 @@ class StrictlyProperBetaEvidentialLoss(nn.Module):
         
         return clf_loss + (0.05 * anneal_coef * kl_loss)
 
+
+class AsymmetricFocalEvidentialLoss(nn.Module):
+    """
+    SOTA 2026: Asymmetric Focal Beta-Evidential Loss.
+    Down-weights easy negatives to focus gradient steps on hard, 
+    diffuse boundaries (Infiltration, Pneumonia, Nodule) and slows down
+    annealing dynamically for ultra-rare classes.
+    """
+    def __init__(self, annealing_epochs=20, gamma=2.0):
+        super().__init__()
+        self.annealing_epochs = max(int(annealing_epochs), 1)
+        self.gamma = gamma
+
+    def beta_kl_divergence(self, alpha, beta):
+        gamma_ab = torch.lgamma(alpha + beta)
+        gamma_a = torch.lgamma(alpha)
+        gamma_b = torch.lgamma(beta)
+        digamma_ab = torch.digamma(alpha + beta)
+        return (gamma_ab - gamma_a - gamma_b) + \
+               (alpha - 1.0) * (torch.digamma(alpha) - digamma_ab) + \
+               (beta - 1.0) * (torch.digamma(beta) - digamma_ab)
+
+    def forward(self, z_posterior, z_v, targets, current_epoch):
+        # 1. Asymmetric Focal Classification Loss (BCE scaled by prediction error)
+        probs = torch.sigmoid(z_posterior)
+        focal_weight = targets * ((1.0 - probs) ** self.gamma) + (1.0 - targets) * (probs ** self.gamma)
+        
+        bce_loss = F.binary_cross_entropy_with_logits(z_posterior, targets, reduction="none")
+        clf_loss = torch.mean(focal_weight * bce_loss)
+
+        # 2. Evidential KL Divergence (on raw unshifted evidence z_v)
+        z_safe = torch.clamp(z_v, min=-10.0, max=10.0) 
+        alpha = torch.exp(z_safe) + 1.0
+        beta = torch.exp(-z_safe) + 1.0
+        
+        alpha_tilde = targets + (1.0 - targets) * alpha
+        beta_tilde = (1.0 - targets) + targets * beta
+        
+        kl_raw = self.beta_kl_divergence(alpha_tilde, beta_tilde)
+        
+        # 3. Class-Conditional Annealing: Slower annealing for low-frequency pathologies
+        pos_freq = torch.mean(targets, dim=0, keepdim=True) # Shape: (1, C)
+        class_anneal_factor = torch.clamp(1.0 / (pos_freq + 1e-5), min=1.0, max=10.0)
+        
+        anneal_coef = torch.clamp(float(current_epoch) / (float(self.annealing_epochs) * class_anneal_factor), max=1.0)
+        kl_loss = torch.mean(anneal_coef * kl_raw)
+        
+        return clf_loss + (0.05 * kl_loss)
+
+
+# ============================================================
+# EVIDENTIAL METRIC COMPUTATION
+# ============================================================
 def get_evidential_metrics(z_posterior):
     prob = torch.sigmoid(z_posterior)
     z_safe = torch.clamp(z_posterior, min=-10.0, max=10.0)
