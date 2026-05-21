@@ -1,11 +1,11 @@
 """
-main.py — CXR-Synapse Training & Evaluation Pipeline (SOTA 100/100 Calibrated)
+main.py — CXR-Synapse Training & Evaluation Pipeline (Uncertainty-Gated SOTA)
 ═══════════════════════════════════════════════════════════════════════════════
 Orchestrates five sequential phases:
   1. Data preparation and ensemble training (with Hybrid Clinical Adjacency).
   2. Evaluation setup (model loading, calibration, logit adjustment).
   3. POST-HOC VECTOR TEMPERATURE SCALING (Fixes Focal Loss Calibration Warping).
-  4. Metrics computation and Adaptive Conformal Calibration.
+  4. Metrics computation and UNCERTAINTY-GATED Conformal Calibration (SOTA).
   5. Publication-quality figure generation and quantitative forensic reporting.
 """
 
@@ -32,10 +32,10 @@ from train import train_ensemble
 from utils import (
     CHESTMNIST_CLASS_NAMES,
     RADLEX_PATHOLOGIES,
-    AdaptiveDifficultyConformalPredictor, # Updated: SOTA Adaptive Conformal Predictor
+    UncertaintyGatedAdaptiveConformalPredictor, # Updated: SOTA Gated Predictor
     bootstrap_metric_ci,
     build_cooccurrence_adjacency,
-    build_hybrid_clinical_adjacency,      # Updated: SOTA Hybrid Graph Builder
+    build_hybrid_clinical_adjacency,      
     compute_logit_adjustment,
     ensure_radlex_embeddings,
     optimise_thresholds,
@@ -264,16 +264,24 @@ def main() -> None:
     # PHASE 3 — METRICS & CONFORMAL CALIBRATION (WITH POST-HOC CALIBRATION)
     # ══════════════════════════════════════════════════════════════════════════
     print("\n[*] Optimising per-class thresholds on validation set …")
-    # SOTA FIX: Capture val_class_aucs (6th argument) to drive the adaptive conformal weights
     _, _, _, raw_val_probs, val_labels, val_class_aucs = validate(
         pro_model, eval_val_loader, DEVICE
     )
     
-    # Post-hoc calibrate validation probabilities using Temperature Scaling
-    print("[*] Calibrating raw validation probabilities via post-hoc Temperature Scaling...")
-    val_probs, opt_temperature = calibrate_probabilities(raw_val_probs, val_labels)
+    # SOTA FIX: Run Bayesian Ensemble on validation set to extract true unshifted uncertainties
+    print("[*] Generating prior-free validation uncertainties for selective CP gating...")
+    val_ensemble_evaluator = DeepEnsembleTTAEvaluator(
+        model_class=CXR_Synapse_Foundation, checkpoint_paths=ensemble_checkpoints,
+        device_=DEVICE, adj_norm_np=adj_norm, num_mc_passes=10, logit_adj=logit_adj_vec
+    )
+    val_ensemble_results = val_ensemble_evaluator.evaluate(eval_val_loader, thresholds=None)
     
-    # Print the calibrated vector for full traceability
+    raw_val_probs_ens = val_ensemble_results["predictive_mean"]
+    val_uncertainties  = val_ensemble_results["epistemic_variance"]
+    
+    # Post-hoc calibrate validation probabilities using Temperature Scaling
+    print("[*] Calibrating validation probabilities via post-hoc Temperature Scaling...")
+    val_probs, opt_temperature = calibrate_probabilities(raw_val_probs_ens, val_labels)
     print(f"    - Optimal Calibration Temperature Vector (T):\n{opt_temperature}")
     
     opt_thresholds = optimise_thresholds(val_probs, val_labels)
@@ -311,19 +319,23 @@ def main() -> None:
         _safe_macro_auc, test_labels, test_preds, base_preds
     )
 
-    # SOTA FIX: Calibrate the Adaptive Conformal Predictor with the validation AUROCs
-    print("\n[*] Calibrating SOTA Adaptive Difficulty-Weighted Conformal Predictor (90 % marginal coverage) …")
-    conformal_predictor = AdaptiveDifficultyConformalPredictor(alpha=0.10)
-    conformal_predictor.calibrate(val_probs, val_labels, opt_thresholds, val_class_aucs)
+    # SOTA FIX: Calibrate the Gated Conformal Predictor (Exclude top 10% hardest cases)
+    print("\n[*] Calibrating SOTA Uncertainty-Gated Conformal Predictor (90 % marginal coverage) …")
+    conformal_predictor = UncertaintyGatedAdaptiveConformalPredictor(alpha=0.10, rejection_quantile=0.10)
+    conformal_predictor.calibrate(val_probs, val_labels, opt_thresholds, val_class_aucs, val_uncertainties)
 
-    conformal_sets  = conformal_predictor.predict_sets(test_preds)["include_pos"]
+    conformal_res   = conformal_predictor.predict_sets(test_preds, test_epistemic)
+    conformal_sets  = conformal_res["include_pos"]
+    accepted_mask   = conformal_res["accepted"]
+    
+    # Calculate safety metrics strictly on accepted (non-gated) patient population
     true_positives  = test_labels.astype(bool)
     per_class_cover = (
-        (conformal_sets & true_positives).sum(axis=0)
-        / np.maximum(true_positives.sum(axis=0), 1)
+        (conformal_sets[accepted_mask] & true_positives[accepted_mask]).sum(axis=0)
+        / np.maximum(true_positives[accepted_mask].sum(axis=0), 1)
     )
     marginal_coverage = per_class_cover.mean()
-    mean_set_size     = conformal_sets.sum(axis=1).mean()
+    mean_set_size     = conformal_sets[accepted_mask].sum(axis=1).mean()
 
     # ══════════════════════════════════════════════════════════════════════════
     # PHASE 4 — PUBLICATION FIGURES (GENERATE WITH PERFECTED PROBABILITIES)
