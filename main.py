@@ -32,7 +32,7 @@ from train import train_ensemble
 from utils import (
     CHESTMNIST_CLASS_NAMES,
     RADLEX_PATHOLOGIES,
-    AdaptiveDifficultyConformalPredictor, # Updated: SOTA Conformal Predictor
+    AdaptiveDifficultyConformalPredictor, # Updated: SOTA Adaptive Conformal Predictor
     bootstrap_metric_ci,
     build_cooccurrence_adjacency,
     build_hybrid_clinical_adjacency,      # Updated: SOTA Hybrid Graph Builder
@@ -213,7 +213,7 @@ def main() -> None:
     train_labels_np = train_emb_dataset.labels.numpy().astype(np.int32)
     adj_threshold   = select_adjacency_threshold(train_labels_np, num_classes=14)
     
-    # SOTA FIX: Load RadLex embeddings FIRST in Phase 1 to construct the Hybrid Clinical Adjacency Matrix
+    # SOTA FIX: Load RadLex embeddings FIRST in Phase 1 so we can build the Hybrid Clinical Adjacency Matrix
     print("[*] Acquiring clinical BioViL-T text embeddings for hybrid graph topology...")
     radlex_embeddings = ensure_radlex_embeddings(
         "radlex_embeddings_14.pth", RADLEX_PATHOLOGIES,
@@ -272,7 +272,9 @@ def main() -> None:
     # Post-hoc calibrate validation probabilities using Temperature Scaling
     print("[*] Calibrating raw validation probabilities via post-hoc Temperature Scaling...")
     val_probs, opt_temperature = calibrate_probabilities(raw_val_probs, val_labels)
-    print(f"    - Optimal Calibration Temperature (T): {opt_temperature}")
+    
+    # Print the calibrated vector for full traceability
+    print(f"    - Optimal Calibration Temperature Vector (T):\n{opt_temperature}")
     
     opt_thresholds = optimise_thresholds(val_probs, val_labels)
 
@@ -280,7 +282,7 @@ def main() -> None:
     base_auc, base_f1, _, raw_base_preds, base_labels, _ = validate(
         pro_model, eval_test_loader, DEVICE
     )
-    # Scale baseline predictions with optimal temperature
+    # Scale baseline predictions with optimal temperature vector
     eps = 1e-6
     base_logits = np.log(np.clip(raw_base_preds, eps, 1.0 - eps) / (1.0 - np.clip(raw_base_preds, eps, 1.0 - eps)))
     base_preds = 1.0 / (1.0 + np.exp(-base_logits / opt_temperature))
