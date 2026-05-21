@@ -1,3 +1,12 @@
+"""
+data.py — CXR-Synapse Data & Loader Engine (SOTA Latent Jitter Edition)
+═══════════════════════════════════════════════════════════════════════════════
+Orchestrates ChestMNIST loaders and adds:
+  • SOTA Latent Space Jittering (Feature space data augmentation).
+  • Forensic Deduplication Audit (MD5 bit-exact cross-split filtering).
+  • Deterministic seed_worker protocol.
+"""
+
 import hashlib
 import logging
 import multiprocessing
@@ -94,9 +103,11 @@ class EmbeddingDataset(Dataset):
     Specialized Dataset for frozen-backbone training.
     Loads pre-computed 1376-dimensional feature maps (8x8 spatial resolution)
     to bypass the ELIXR-C inference overhead during training.
+    
+    Includes Latent Space Jittering for robust feature augmentation.
     """
 
-    def __init__(self, path: str):
+    def __init__(self, path: str, split: str = "train", jitter_eps: float = 0.015):
         if not os.path.exists(path):
             raise FileNotFoundError(f"Embedding file not found: {path}\nPlease run extraction first.")
 
@@ -104,6 +115,8 @@ class EmbeddingDataset(Dataset):
         data = torch.load(path, map_location="cpu", weights_only=True)
         self.features = data["features"].float()
         self.labels = data["labels"].float()
+        self.split = split
+        self.jitter_eps = jitter_eps
 
         # Structural Integrity Check: Ensure feature/label alignment
         n_f, n_l = self.features.shape[0], self.labels.shape[0]
@@ -116,7 +129,7 @@ class EmbeddingDataset(Dataset):
             self.labels = self.labels[:_min]
 
         self.n = self.features.shape[0]
-        print(f"  EmbeddingDataset '{path}': {self.n:,} samples, feat={tuple(self.features.shape[1:])}")
+        print(f"  EmbeddingDataset '{path}' ({split}): {self.n:,} samples, feat={tuple(self.features.shape[1:])}")
         log_process("data", "embedding_dataset_loaded", path=path, samples=self.n,
                     feature_shape=tuple(self.features.shape[1:]))
 
@@ -124,7 +137,17 @@ class EmbeddingDataset(Dataset):
         return self.n
 
     def __getitem__(self, i):
-        return self.features[i], self.labels[i]
+        feat = self.features[i]
+        label = self.labels[i]
+        
+        # SOTA: Latent Space Jittering (Feature space data augmentation)
+        # Prevents Pathology-as-Query transformer layers from overfitting on static grids.
+        # Only applied during training to preserve exact inference validity.
+        if self.split == "train":
+            noise = torch.randn_like(feat) * self.jitter_eps
+            feat = feat + noise
+            
+        return feat, label
 
 
 def seed_worker(worker_id):
@@ -146,9 +169,9 @@ def get_dataloaders():
     # Dynamic worker calculation based on CPU topology
     NUM_WORKERS = 0 if os.name == "nt" else min(4, multiprocessing.cpu_count() - 1)
 
-    train_emb_dataset = EmbeddingDataset(os.path.join(EMBEDDING_DIR, "train_embeddings.pt"))
-    val_emb_dataset = EmbeddingDataset(os.path.join(EMBEDDING_DIR, "val_embeddings.pt"))
-    test_emb_dataset = EmbeddingDataset(os.path.join(EMBEDDING_DIR, "test_embeddings.pt"))
+    train_emb_dataset = EmbeddingDataset(os.path.join(EMBEDDING_DIR, "train_embeddings.pt"), split="train")
+    val_emb_dataset = EmbeddingDataset(os.path.join(EMBEDDING_DIR, "val_embeddings.pt"), split="val")
+    test_emb_dataset = EmbeddingDataset(os.path.join(EMBEDDING_DIR, "test_embeddings.pt"), split="test")
 
     # Shared configuration for DataLoader lifecycle management
     _loader_kw = dict(
