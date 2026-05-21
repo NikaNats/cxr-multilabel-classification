@@ -1,10 +1,11 @@
 """
-train.py — CXR-Synapse Training Pipeline (Asymmetric Focal EDL Edition - Fixed)
+train.py — CXR-Synapse Training Pipeline (Decoupled Weight Decay Edition)
 ═══════════════════════════════════════════════════════════════════════════════
 Orchestrates single-model and ensemble training with:
   • SOTA Asymmetric Focal Evidential Loss (Gamma = 2.0).
   • Class-Conditional Evidential Annealing.
-  • Language-Invariant Semantic Anchoring (LISA) regularization.
+  • SOTA Decoupled Weight Decay (Excludes Biases & LayerNorms from L2).
+  • Manifold-Preserving LISA (MP-LISA) regularization.
   • Stochastic Weight Averaging (SWA) and AdamW optimization.
 """
 
@@ -50,7 +51,26 @@ def train_single_model(seed, adj_norm_np, train_emb_dataset, train_loader, val_l
     # SOTA: Instantiate the newly engineered Asymmetric Focal Evidential Loss
     loss_fn = AsymmetricFocalEvidentialLoss(annealing_epochs=20, gamma=2.0).to(DEVICE)
     
-    optimizer = torch.optim.AdamW(model.parameters(), lr=CFG["base_lr"], weight_decay=CFG["weight_decay"])
+    # SOTA FIX: Decoupled Weight Decay Parameter Grouping
+    # We split parameters so that we do NOT apply L2 regularization to biases, 
+    # positional encodings, or LayerNorm scale/shift parameters.
+    decay_params = []
+    no_decay_params = []
+    for name, param in model.named_parameters():
+        if not param.requires_grad:
+            continue
+        # Keep 1D parameters (biases, layer norms, and 2D sincos pos encodings) decay-free
+        if len(param.shape) == 1 or name.endswith(".bias") or "pos_embed" in name:
+            no_decay_params.append(param)
+        else:
+            decay_params.append(param)
+
+    optim_groups = [
+        {"params": decay_params, "weight_decay": CFG["weight_decay"]},
+        {"params": no_decay_params, "weight_decay": 0.0} # Absolute 0.0 decay for structural layers
+    ]
+    
+    optimizer = torch.optim.AdamW(optim_groups, lr=CFG["base_lr"])
     scaler = torch.amp.GradScaler('cuda', enabled=(DEVICE.type == "cuda"))
 
     # LISA: Calculate the Semantic Anchor (Original RadLex Topology)
@@ -88,8 +108,13 @@ def train_single_model(seed, adj_norm_np, train_emb_dataset, train_loader, val_l
                 current_queries = model.pathology_router.text_proj(model.radlex_emb)
                 norm_queries = F.normalize(current_queries, p=2, dim=-1)
                 current_topology = torch.matmul(norm_queries, norm_queries.t())
-                # FIX: Removed F.add typo, implemented clean and safe F.mse_loss computation
-                anchor_loss = F.mse_loss(current_topology, semantic_anchor)
+                
+                # SOTA: Manifold-Preserving LISA (MP-LISA) via KL-Divergence
+                p_target = F.softmax(semantic_anchor / 0.1, dim=-1)
+                q_current = F.log_softmax(current_topology / 0.1, dim=-1)
+                
+                # Kullback-Leibler Divergence is mathematically flexible and SOTA
+                anchor_loss = F.kl_div(q_current, p_target, reduction="batchmean")
                 
                 loss = evidential_loss + (0.5 * anchor_loss)
                 
