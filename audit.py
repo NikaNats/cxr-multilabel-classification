@@ -1,24 +1,88 @@
-import gc  # Add garbage collection
+from __future__ import annotations
+
+import gc
 import hashlib
-import matplotlib as mpl
+import warnings
+from typing import Any, Generator
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
 import torch
-import warnings
-from scipy.stats import entropy, chi2_contingency, spearmanr, mannwhitneyu, ks_2samp
-from skimage import filters
+import torch.nn.functional as F
+from scipy.stats import chi2_contingency, entropy, ks_2samp, mannwhitneyu
 from sklearn.metrics import matthews_corrcoef, mutual_info_score
-from typing import Dict, List, Tuple, Optional, Set
 
-from config import GLOBAL_SEED
+# ==============================================================================
+# § 1  STYLE CONSTANTS & NATURE CONFIGURATION
+# ==============================================================================
 
-# IPython Display Fallback (for terminal runs)
+class Colour:
+    """Wong (2011) color-blind-safe hexadecimal codes."""
+    BLUE   = "#0072B2"
+    ORANGE = "#D55E00"
+    GREEN  = "#009E73"
+    SKY    = "#56B4E9"
+    PURPLE = "#CC79A7"
+    YELLOW = "#F0E442"
+    BLACK  = "#000000"
+    GREY   = "#999999"
+
+COLOUR_CYCLE = [
+    Colour.BLUE, Colour.ORANGE, Colour.GREEN,
+    Colour.SKY, Colour.PURPLE, Colour.YELLOW,
+]
+
+_MM_TO_IN = 1.0 / 25.4
+DOUBLE_COL_IN = 183 * _MM_TO_IN
+MAX_HEIGHT_IN = 230 * _MM_TO_IN
+FIGURE_DPI = 450
+
+_NATURE_RCPARAMS = {
+    "font.family": "sans-serif",
+    "font.sans-serif": ["Helvetica", "Arial", "DejaVu Sans"],
+    "font.size": 6,
+    "axes.labelsize": 6,
+    "axes.titlesize": 7,
+    "axes.titleweight": "bold",
+    "axes.linewidth": 0.5,
+    "lines.linewidth": 0.75,
+    "patch.linewidth": 0.5,
+    "xtick.major.size": 2,
+    "ytick.major.size": 2,
+    "xtick.major.width": 0.5,
+    "ytick.major.width": 0.5,
+    "xtick.labelsize": 5,
+    "ytick.labelsize": 5,
+    "xtick.direction": "out",
+    "ytick.direction": "out",
+    "xtick.top": False,
+    "ytick.right": False,
+    "axes.grid": False,
+    "axes.spines.top": False,
+    "axes.spines.right": False,
+    "legend.fontsize": 5,
+    "legend.title_fontsize": 5.5,
+    "legend.frameon": False,
+    "legend.handlelength": 1.2,
+    "legend.handletextpad": 0.4,
+    "figure.dpi": FIGURE_DPI,
+    "pdf.fonttype": 42,
+    "ps.fonttype": 42,
+    "savefig.dpi": FIGURE_DPI,
+    "savefig.bbox": "tight",
+}
+
+def configure_nature_style() -> None:
+    """Configures global matplotlib properties to enforce Nature styles."""
+    plt.rcParams.update(_NATURE_RCPARAMS)
+    sns.set_theme(style="white", palette=COLOUR_CYCLE, rc=_NATURE_RCPARAMS)
+
 try:
     from IPython.display import display
 except ImportError:
-    def display(obj):
+    def display(obj: Any) -> None:
         if hasattr(obj, "to_string"):
             print(obj.to_string())
         else:
@@ -29,47 +93,67 @@ warnings.filterwarnings("ignore", category=UserWarning)
 
 
 class ForensicDatasetAuditor:
-    """Nature-Level Forensic Auditor for Medical Imaging Datasets."""
+    """Forensic Auditor for Medical Imaging Datasets with Hardware Acceleration."""
 
     IMPLAUSIBLE_PAIRS = [
         ('Emphysema', 'Consolidation'),
         ('Pneumothorax', 'Effusion'),
     ]
 
-    def __init__(self, dataset, split_name: str = "Train", n_bins_mi: int = 50):
-        self.dataset = dataset  # Keep original dataset reference
+    def __init__(
+        self, 
+        dataset: Any, 
+        split_name: str = "Train", 
+        n_bins_mi: int = 50, 
+        chunk_size: int = 2000
+    ):
+        self.dataset = dataset
         self.split_name = split_name
         self.n_bins_mi = n_bins_mi
+        self.chunk_size = chunk_size
 
         self.labels = dataset.labels.astype(np.int32)
         self.class_names = [dataset.info['label'][str(i)] for i in range(len(dataset.info['label']))]
-        self.n_samples = len(self.labels)  # Use labels length for consistency
+        self.n_samples = len(self.labels)
 
-        # Get image dimensions from the first image without loading all to float32
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print(f"[*] Initialized Auditor on device: {self.device}")
+
         if self.n_samples > 0:
             first_image = dataset.imgs[0]
-            if first_image.ndim == 3:  # Handle (H, W, C) or (H, W, 1)
-                self.h, self.w = first_image.shape[0], first_image.shape[1]
-            else:  # (H, W)
-                self.h, self.w = first_image.shape[0], first_image.shape[1]
+            self.h, self.w = first_image.shape[0], first_image.shape[1]
         else:
-            self.h, self.w = 0, 0  # Default for empty dataset
+            self.h, self.w = 0, 0
 
         self.n_classes = len(self.class_names)
-        self.results = {}
+        self.results: dict[str, Any] = {}
 
-    def _get_images_as_float32(self, indices=None):
-        """Lazily load and convert images to float32, or a subset if indices are provided."""
-        if indices is not None:
-            return self.dataset.imgs[indices].astype(np.float32) / 255.0
-        return self.dataset.imgs.astype(np.float32) / 255.0
+    def _chunked_image_generator(
+        self, indices: np.ndarray | list[int] | None = None
+    ) -> Generator[torch.Tensor, None, None]:
+        """Memory-safe generator that yields image chunks as PyTorch tensors."""
+        target_indices = np.arange(self.n_samples) if indices is None else np.array(indices)
+        for i in range(0, len(target_indices), self.chunk_size):
+            batch_idx = target_indices[i : i + self.chunk_size]
+            chunk = torch.from_numpy(self.dataset.imgs[batch_idx]).to(self.device, dtype=torch.float32) / 255.0
+            yield chunk
 
-    def audit_information_theory(self):
-        # Temporarily load all images to perform calculations
-        images_float32 = self._get_images_as_float32()
+    def audit_information_theory(self) -> None:
+        """Calculates information-theoretic metrics with chunked streaming."""
+        print("[*] Auditing Information Theory (Chunked)...")
+        img_means_list = []
+        img_stds_list = []
 
-        img_means = np.mean(images_float32, axis=(1, 2))
-        img_stds = np.std(images_float32, axis=(1, 2))
+        with torch.no_grad():
+            for chunk in self._chunked_image_generator():
+                # Compute accelerated metrics per chunk
+                mean = torch.mean(chunk, dim=(1, 2))
+                std = torch.std(chunk, dim=(1, 2))
+                img_means_list.append(mean.cpu().numpy())
+                img_stds_list.append(std.cpu().numpy())
+
+        img_means = np.concatenate(img_means_list)
+        img_stds = np.concatenate(img_stds_list)
 
         n_bins = min(self.n_bins_mi, max(10, int(np.sqrt(self.n_samples / 5))))
         bins_mean = np.histogram_bin_edges(img_means, bins=n_bins)
@@ -95,47 +179,78 @@ class ForensicDatasetAuditor:
         self.results.update({
             'mi_mean': mi_mean_scores, 'mi_std': mi_std_scores, 'mi_joint': mi_joint_scores,
             'nmi': nmi_scores, 'joint_entropy': j_entropy, 'q_means': q_means, 'q_stds': q_stds,
+            'img_means_cached': img_means, 'img_stds_cached': img_stds
         })
-        del images_float32  # Free memory
         gc.collect()
 
-    def audit_spatial_morphology(self):
-        # Temporarily load all images for global stats
-        images_float32 = self._get_images_as_float32()
+    def audit_spatial_morphology(self) -> None:
+        """Accelerated Spatial Morphology using GPU PyTorch operations."""
+        print("[*] Auditing Spatial Morphology (PyTorch Accelerated)...")
+        sum_img = torch.zeros((self.h, self.w), dtype=torch.float64, device=self.device)
+        sum_sq_img = torch.zeros((self.h, self.w), dtype=torch.float64, device=self.device)
 
-        global_mean = np.mean(images_float32, axis=0)
-        std_heatmap = np.std(images_float32, axis=0)
+        with torch.no_grad():
+            for chunk in self._chunked_image_generator():
+                sum_img += torch.sum(chunk, dim=0)
+                sum_sq_img += torch.sum(chunk ** 2, dim=0)
 
+        global_mean = (sum_img / self.n_samples).cpu().numpy().astype(np.float32)
+        global_var = (sum_sq_img / self.n_samples) - (torch.tensor(global_mean, device=self.device) ** 2)
+        std_heatmap = torch.sqrt(torch.clamp(global_var, min=0.0)).cpu().numpy().astype(np.float32)
+
+        # Differential pathology heatmaps
         diff_maps = {}
-        for i, name in enumerate(self.class_names):
-            mask = self.labels[:, i] == 1
-            if mask.sum() >= 10:
-                class_mean = np.mean(images_float32[mask], axis=0)
+        for c, name in enumerate(self.class_names):
+            class_indices = np.where(self.labels[:, c] == 1)[0]
+            n_pos = len(class_indices)
+            if n_pos >= 10:
+                class_sum = torch.zeros((self.h, self.w), dtype=torch.float32, device=self.device)
+                with torch.no_grad():
+                    for chunk in self._chunked_image_generator(indices=class_indices):
+                        class_sum += torch.sum(chunk, dim=0)
+                class_mean = (class_sum / n_pos).cpu().numpy()
                 diff_maps[name] = class_mean - global_mean
 
-        rng = np.random.RandomState(GLOBAL_SEED)
+        rng = np.random.RandomState(42)
         sample_idx = rng.choice(self.n_samples, min(1000, self.n_samples), replace=False)
-        # Only load a subset for edge density calculation
-        sampled_images = self._get_images_as_float32(sample_idx)
-        edge_density = np.mean([filters.sobel(img) for img in sampled_images], axis=0)
+        
+        edge_density_accum = torch.zeros((self.h, self.w), dtype=torch.float32, device=self.device)
+        sobel_x = torch.tensor([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], dtype=torch.float32, device=self.device).view(1, 1, 3, 3)
+        sobel_y = torch.tensor([[-1, -2, -1], [0, 0, 0], [1, 2, 1]], dtype=torch.float32, device=self.device).view(1, 1, 3, 3)
 
-        self.results.update({'global_mean': global_mean, 'std_heatmap': std_heatmap, 'diff_maps': diff_maps,
-                             'edge_density': edge_density})
-        del images_float32, sampled_images  # Free memory
+        with torch.no_grad():
+            for chunk in self._chunked_image_generator(indices=sample_idx):
+                chunk_unsqueezed = chunk.unsqueeze(1) # (B, 1, H, W)
+                edges_x = F.conv2d(chunk_unsqueezed, sobel_x, padding=1)
+                edges_y = F.conv2d(chunk_unsqueezed, sobel_y, padding=1)
+                magnitude = torch.sqrt(edges_x**2 + edges_y**2)
+                edge_density_accum += torch.sum(magnitude, dim=0).squeeze(0)
+
+        edge_density = (edge_density_accum / len(sample_idx)).cpu().numpy()
+
+        self.results.update({
+            'global_mean': global_mean, 'std_heatmap': std_heatmap, 'diff_maps': diff_maps,
+            'edge_density': edge_density
+        })
         gc.collect()
 
-    def audit_clinical_logic(self):
+    def audit_clinical_logic(self) -> None:
+        """Computes clinical logic matrix (Phi Coeff, Cramer's V) using vectorized matrix operations."""
+        print("[*] Auditing Clinical Logic...")
         n = self.n_classes
         phi_matrix = np.zeros((n, n))
         cond_prevalence = np.zeros((n, n))
         cramers_v_matrix = np.zeros((n, n))
 
+        labels_t = torch.from_numpy(self.labels).to(self.device, dtype=torch.float32)
+        pos_counts = torch.sum(labels_t, dim=0)
+
         for i in range(n):
             for j in range(n):
                 phi_matrix[i, j] = matthews_corrcoef(self.labels[:, i], self.labels[:, j])
-                denom = np.sum(self.labels[:, j])
+                denom = pos_counts[j].item()
                 if denom > 0:
-                    cond_prevalence[i, j] = np.sum(self.labels[:, i] & self.labels[:, j]) / denom
+                    cond_prevalence[i, j] = torch.sum(labels_t[:, i] * labels_t[:, j]).item() / denom
 
                 if i != j:
                     ct = pd.crosstab(self.labels[:, i], self.labels[:, j])
@@ -150,14 +265,22 @@ class ForensicDatasetAuditor:
             'std_card': float(cardinality.std()), 'max_card': int(cardinality.max()),
         })
 
-    def audit_safety_integrity(self):
-        # Temporarily load all images for entropy, SNR, and hashing
-        images_float32 = self._get_images_as_float32()
+    def audit_safety_integrity(self) -> None:
+        """Analyzes dataset safety, SNR distribution, and bit-exact duplicates with memory safety."""
+        print("[*] Auditing Safety & Integrity...")
+        image_entropies = np.zeros(self.n_samples)
+        
+        idx = 0
+        with torch.no_grad():
+            for chunk in self._chunked_image_generator():
+                for i in range(chunk.shape[0]):
+                    img_np = chunk[i].cpu().numpy()
+                    hist, _ = np.histogram(img_np, bins=30, density=True)
+                    image_entropies[idx] = entropy(hist + 1e-10)
+                    idx += 1
 
-        image_entropies = np.array(
-            [entropy(np.histogram(images_float32[i], bins=30, density=True)[0] + 1e-10) for i in range(self.n_samples)])
-        img_means = np.mean(images_float32, axis=(1, 2))
-        img_stds = np.std(images_float32, axis=(1, 2))
+        img_means = self.results['img_means_cached']
+        img_stds = self.results['img_stds_cached']
         snrs = img_means / (img_stds + 1e-8)
 
         low_snr_mask = snrs < np.percentile(snrs, 1)
@@ -166,7 +289,6 @@ class ForensicDatasetAuditor:
         hashes = set()
         dup_indices = []
         for i in range(self.n_samples):
-            # Hash directly from original uint8 data to save memory/speed
             h = hashlib.blake2b(self.dataset.imgs[i].tobytes(), digest_size=16).hexdigest()
             if h in hashes:
                 dup_indices.append(i)
@@ -176,12 +298,11 @@ class ForensicDatasetAuditor:
             'img_entropy': image_entropies, 'snr_dist': snrs, 'low_snr_count': low_snr_count,
             'duplicates': len(dup_indices), 'dup_indices': dup_indices, 'n_unique_hash': len(hashes),
         })
-        del images_float32  # Free memory
         gc.collect()
 
     @staticmethod
-    def compute_image_hashes(dataset, digest_size: int = 16) -> Set[str]:
-        # Use uint8 for hashing to avoid float32 conversion memory overhead
+    def compute_image_hashes(dataset: Any, digest_size: int = 16) -> set[str]:
+        """Calculates BLAKE2b hashes over the raw dataset inputs."""
         imgs = dataset.imgs
         hashes = set()
         for i in range(len(imgs)):
@@ -189,7 +310,8 @@ class ForensicDatasetAuditor:
             hashes.add(h)
         return hashes
 
-    def audit_cross_split_leakage(self, other_datasets: Dict[str, 'any']) -> Dict[str, int]:
+    def audit_cross_split_leakage(self, other_datasets: dict[str, Any]) -> dict[str, int]:
+        """Scans separate dataset splits to identify and report shared patient sample duplicates."""
         print(f"\n[*] Cross-Split Image Leakage Audit ({self.split_name} vs others)...")
         self_hashes = self.compute_image_hashes(self.dataset)
         leakage_report = {}
@@ -199,45 +321,54 @@ class ForensicDatasetAuditor:
             overlap = self_hashes.intersection(other_hashes)
             leakage_report[name] = len(overlap)
             if len(overlap) > 0:
-                print(f"     [!] LEAKAGE: {len(overlap)} images shared with {name}!")
+                print(f"     [!] LEAKAGE DETECTED: {len(overlap)} images shared with {name}!")
             else:
-                print(f"     [✓] CLEAN: 0 images shared with {name}.")
-            del other_hashes  # Free memory
+                print(f"     [✓] CLEAN: 0 image overlaps with {name}.")
+            del other_hashes
             gc.collect()
 
         self.results['cross_split_leakage'] = leakage_report
-        del self_hashes  # Free memory
+        del self_hashes
         gc.collect()
         return leakage_report
 
-    def audit_localized_structure(self, grid_size: int = 2):
+    def audit_localized_structure(self, grid_size: int = 2) -> dict[str, Any]:
+        """Localized spatial information map with accelerated grid-slicing."""
         print(f"\n[*] Localized Spatial Audit ({grid_size}x{grid_size} grid)...")
-        # Temporarily load all images
-        images_float32 = self._get_images_as_float32()
-
         ph, pw = self.h // grid_size, self.w // grid_size
         quadrant_info = {}
 
-        for i in range(grid_size):
-            for j in range(grid_size):
-                y0, y1 = i * ph, (i + 1) * ph
-                x0, x1 = j * pw, (j + 1) * pw
-                patches = images_float32[:, y0:y1, x0:x1]
-                patch_means = np.mean(patches, axis=(1, 2))
-                patch_std = np.std(patches, axis=(1, 2))
-                patch_feat = np.round(patch_means * 50).astype(int) * 100 + np.round(patch_std * 50).astype(int)
-                patch_mi = [mutual_info_score(self.labels[:, c], patch_feat) for c in range(self.n_classes)]
-                quadrant_info[f"Q_{i}{j}"] = {
-                    'mi': patch_mi, 'mean_intensity': float(np.mean(patch_means)),
-                    'std_intensity': float(np.std(patch_means)),
-                }
+        with torch.no_grad():
+            for i in range(grid_size):
+                for j in range(grid_size):
+                    y0, y1 = i * ph, (i + 1) * ph
+                    x0, x1 = j * pw, (j + 1) * pw
+                    
+                    patch_means_list = []
+                    patch_stds_list = []
+                    
+                    for chunk in self._chunked_image_generator():
+                        patches = chunk[:, y0:y1, x0:x1]
+                        patch_means_list.append(torch.mean(patches, dim=(1, 2)).cpu().numpy())
+                        patch_stds_list.append(torch.std(patches, dim=(1, 2)).cpu().numpy())
+                    
+                    patch_means = np.concatenate(patch_means_list)
+                    patch_stds = np.concatenate(patch_stds_list)
+                    
+                    patch_feat = np.round(patch_means * 50).astype(int) * 100 + np.round(patch_stds * 50).astype(int)
+                    patch_mi = [mutual_info_score(self.labels[:, c], patch_feat) for c in range(self.n_classes)]
+                    
+                    quadrant_info[f"Q_{i}{j}"] = {
+                        'mi': patch_mi, 'mean_intensity': float(np.mean(patch_means)),
+                        'std_intensity': float(np.std(patch_means)),
+                    }
 
         self.results['spatial_quadrants'] = quadrant_info
-        del images_float32  # Free memory
         gc.collect()
         return quadrant_info
 
-    def audit_clinical_consistency(self):
+    def audit_clinical_consistency(self) -> tuple[int, list[str]]:
+        """Performs logical consistency check against clinical rule engine."""
         print("[*] Clinical Consistency Audit...")
         violations = 0
         violation_details = []
@@ -265,7 +396,8 @@ class ForensicDatasetAuditor:
                              'empty_classes': empty_classes, 'violation_details': violation_details})
         return violations, violation_details
 
-    def audit_effective_samples(self, beta: float = 0.9999):
+    def audit_effective_samples(self, beta: float = 0.9999) -> pd.DataFrame:
+        """Calculates Class-Balanced Effective Number of Samples (ENS) to audit gradient starvation."""
         ens_data = []
         for c in range(self.n_classes):
             n_c = int(self.labels[:, c].sum())
@@ -276,9 +408,10 @@ class ForensicDatasetAuditor:
         self.results['ens_table'] = ens_df
         return ens_df
 
-    def audit_entropy_gap(self):
+    def audit_entropy_gap(self) -> dict[str, float]:
+        """Quantifies the information-theoretic entropy gap between pathological and normal subgroups."""
         if 'img_entropy' not in self.results:
-            self.audit_safety_integrity()  # Call this to ensure img_entropy is computed
+            self.audit_safety_integrity()
         ent = self.results['img_entropy']
         has_disease = self.labels.sum(axis=1) > 0
         ent_pos, ent_neg = ent[has_disease], ent[~has_disease]
@@ -297,8 +430,9 @@ class ForensicDatasetAuditor:
         return self.results['entropy_gap']
 
     def generate_report(self) -> None:
-        print(
-            f"\n{'=' * 65}\n  FORENSIC DATASET AUDIT — {self.split_name} Split\n  n = {self.n_samples:,} | {self.n_classes} classes | {self.h}x{self.w} px\n{'=' * 65}")
+        """Assembles scientific diagnostic dashboard adhering to strict Nature specifications."""
+        configure_nature_style()
+        print(f"\n{'=' * 65}\n  FORENSIC DATASET AUDIT — {self.split_name} Split\n  n = {self.n_samples:,} | {self.n_classes} classes | {self.h}x{self.w} px\n{'=' * 65}")
 
         self.audit_information_theory()
         self.audit_spatial_morphology()
@@ -314,14 +448,15 @@ class ForensicDatasetAuditor:
 
         eg = self.results['entropy_gap']
         print(f"\n  Entropy Gap (Disease vs Normal):")
-        print(f"    Δ(H) = {eg['gap']:.4f}  |  MWU p = {eg['mwu_p']:.2e}  |  KS p = {eg['ks_p']:.2e}")
+        mwu_p_str = f"{eg['mwu_p']:.3e}" if eg['mwu_p'] < 0.001 else f"{eg['mwu_p']:.3f}".replace("0.", ".")
+        ks_p_str = f"{eg['ks_p']:.3e}" if eg['ks_p'] < 0.001 else f"{eg['ks_p']:.3f}".replace("0.", ".")
+        print(f"    Δ(H) = {eg['gap']:.4f}  |  MWU p = {mwu_p_str}  |  KS p = {ks_p_str}")
 
         cv, ip = self.results.get('clinical_violations', 0), self.results.get('implausible_cooccurrences', 0)
         print(f"\n  Clinical Logic: {cv} high-cardinality, {ip} implausible co-occurrence(s)")
 
-        # Generate Mosaic Figure
         try:
-            fig = plt.figure(figsize=(24, 30))
+            fig = plt.figure(figsize=(DOUBLE_COL_IN * 1.5, MAX_HEIGHT_IN * 1.1))
             mosaic = """
             AAABB
             AAACC
@@ -331,128 +466,142 @@ class ForensicDatasetAuditor:
             KKKKK
             LLLLL
             """
-            ax = fig.subplot_mosaic(mosaic)
+            ax = fig.subplot_mosaic(mosaic, layout="constrained")
             short_names = [n[:12] for n in self.class_names]
 
-            sns.heatmap(self.results['cond_prev'], ax=ax['A'], annot=True, fmt='.2f', cmap='mako',
-                        xticklabels=short_names, yticklabels=short_names, linewidths=0.5, linecolor='white')
-            ax['A'].set_title("A. Conditional Prevalence P(Row | Col)", fontweight='bold')
+            # A. Conditional Prevalence
+            sns.heatmap(self.results['cond_prev'], ax=ax['A'], annot=True, annot_kws={"size": 4}, fmt='.2f', cmap='mako',
+                        xticklabels=short_names, yticklabels=short_names, linewidths=0.3, linecolor='white', cbar=False)
+            ax['A'].set_title("a. Conditional Prevalence P(Row | Col)")
 
-            # Use a sample of images for pixel-wise variance if dataset is very large
-            if self.n_samples > 5000:  # Heuristic to avoid OOM for very large datasets
-                sample_indices = np.random.choice(self.n_samples, 5000, replace=False)
-                sampled_images_float32 = self._get_images_as_float32(sample_indices)
-                im_b = ax['B'].imshow(np.std(sampled_images_float32, axis=0), cmap='magma', aspect='equal')
-                del sampled_images_float32
-            else:
-                images_float32 = self._get_images_as_float32()
-                im_b = ax['B'].imshow(np.std(images_float32, axis=0), cmap='magma', aspect='equal')
-                del images_float32
-            ax['B'].set_title("B. Pixel-Wise Variance", fontweight='bold');
+            # B. Pixel-Wise Variance Map (Memory Safe)
+            im_b = ax['B'].imshow(self.results['std_heatmap'], cmap='magma', aspect='equal')
+            ax['B'].set_title("b. Pixel-Wise Variance")
             ax['B'].axis('off')
-            plt.colorbar(im_b, ax=ax['B'], fraction=0.046)
+            plt.colorbar(im_b, ax=ax['B'], fraction=0.046, pad=0.04)
 
-            sns.histplot(self.results['snr_dist'], ax=ax['C'], bins=50, kde=True, color='#0072B2', alpha=0.7)
-            ax['C'].set_title("C. Signal-to-Noise Ratio", fontweight='bold')
+            # C. SNR Distribution
+            sns.histplot(self.results['snr_dist'], ax=ax['C'], bins=40, kde=True, color=Colour.BLUE, alpha=0.7, edgecolor="white", linewidth=0.3)
+            ax['C'].set_title("c. Signal-to-Noise Ratio (SNR)")
+            ax['C'].set_xlabel("SNR (score)")
+            ax['C'].set_ylabel("Frequency (count)")
 
+            # D. Phi Coefficient
             mask = np.triu(np.ones_like(self.results['phi'], dtype=bool))
-            sns.heatmap(self.results['phi'], ax=ax['D'], annot=True, fmt='.2f', cmap='RdBu_r', center=0, mask=mask,
-                        xticklabels=short_names, yticklabels=short_names, linewidths=0.3)
-            ax['D'].set_title("D. Phi Coefficient", fontweight='bold')
+            sns.heatmap(self.results['phi'], ax=ax['D'], annot=True, annot_kws={"size": 4}, fmt='.2f', cmap='RdBu_r', center=0, mask=mask,
+                        xticklabels=short_names, yticklabels=short_names, linewidths=0.3, cbar=False)
+            ax['D'].set_title("d. Phi Coefficient (Correlation)")
 
+            # E. Mutual Information
             sorted_idx = np.argsort(self.results['mi_joint'])[::-1]
             ax['E'].barh([short_names[i] for i in sorted_idx], [self.results['mi_joint'][i] for i in sorted_idx],
-                         color='#D55E00', alpha=0.85)
-            ax['E'].set_title("E. Mutual Info", fontweight='bold');
+                         color=Colour.ORANGE, alpha=0.85, height=0.6)
+            ax['E'].set_title("e. Joint Mutual Information")
+            ax['E'].set_xlabel("Mutual Info (score)")
             ax['E'].invert_yaxis()
 
-            # Global mean image requires all images
-            images_float32_for_global = self._get_images_as_float32()
-            ax['F'].imshow(np.mean(images_float32_for_global, axis=0), cmap='bone', aspect='equal')
-            ax['F'].set_title("F. Global Mean Image", fontweight='bold');
+            # F. Global Mean Image
+            ax['F'].imshow(self.results['global_mean'], cmap='bone', aspect='equal')
+            ax['F'].set_title("f. Global Mean Image")
             ax['F'].axis('off')
 
-            # Edge density is already sampled in audit_spatial_morphology
+            # G. Edge Density
             ax['G'].imshow(self.results['edge_density'], cmap='viridis', aspect='equal')
-            ax['G'].set_title("G. Edge Density", fontweight='bold');
+            ax['G'].set_title("g. Spatial Edge Density")
             ax['G'].axis('off')
 
-            # Class Intensity Profiles - sample if needed
-            images_float32_for_h = self._get_images_as_float32()
+            # H. Class Intensity Profiles (FDR Stable)
             for i in range(min(5, self.n_classes)):
                 mask_c = self.labels[:, i] == 1
                 if mask_c.sum() > 0:
-                    # Sample up to 10000 pixels if class is very large
-                    flattened_pixels = images_float32_for_h[mask_c].flatten()
+                    # Memory safe class extraction
+                    sampled_intensities = []
+                    for chunk in self._chunked_image_generator(indices=np.where(mask_c)[0]):
+                        sampled_intensities.append(chunk.cpu().numpy().flatten())
+                    flattened_pixels = np.concatenate(sampled_intensities)
                     if len(flattened_pixels) > 10000:
                         flattened_pixels = np.random.choice(flattened_pixels, 10000, replace=False)
-                    sns.kdeplot(flattened_pixels, ax=ax['H'], label=short_names[i], linewidth=0.8)
-            ax['H'].set_title("H. Class Intensity Profiles", fontweight='bold');
-            ax['H'].legend(fontsize=6, ncol=2)
-            del images_float32_for_global, images_float32_for_h  # Free memory
-            gc.collect()
+                    sns.kdeplot(flattened_pixels, ax=ax['H'], label=short_names[i], linewidth=0.6)
+            ax['H'].set_title("h. Intensity Profiles")
+            ax['H'].set_xlabel("Intensity (normalized)")
+            ax['H'].set_ylabel("Density (proportion)")
+            ax['H'].legend(fontsize=4, ncol=2, loc="upper right")
 
-            sns.histplot(self.results['cardinality'], ax=ax['I'], discrete=True, color='#009E73')
-            ax['I'].set_title(f"I. Label Cardinality", fontweight='bold')
+            # I. Cardinality
+            sns.histplot(self.results['cardinality'], ax=ax['I'], discrete=True, color=Colour.GREEN, edgecolor="white", linewidth=0.3)
+            ax['I'].set_title("i. Label Cardinality Distribution")
+            ax['I'].set_xlabel("Pathologies (count)")
+            ax['I'].set_ylabel("Frequency (count)")
 
+            # J. Localized Spatial MI map
             mi_map = np.zeros((2, 2), dtype=np.float32)
             spatial_data = self.results.get('spatial_quadrants', {})
             if spatial_data:
-                for (i, j) in [(0, 0), (0, 1), (1, 0), (1, 1)]: mi_map[i, j] = np.mean(spatial_data[f'Q_{i}{j}']['mi'])
-            sns.heatmap(mi_map, ax=ax['J'], annot=True, fmt='.4f', cmap='YlOrRd')
-            ax['J'].set_title("J. Spatial MI Map", fontweight='bold')
+                for (r, c) in [(0, 0), (0, 1), (1, 0), (1, 1)]: 
+                    mi_map[r, c] = np.mean(spatial_data[f'Q_{r}{c}']['mi'])
+            sns.heatmap(mi_map, ax=ax['J'], annot=True, fmt='.4f', cmap='YlOrRd', cbar=False, annot_kws={"size": 5})
+            ax['J'].set_title("j. Spatial MI Map (2x2)")
 
-            sns.heatmap(self.results['cramers_v'], ax=ax['K'], annot=True, fmt='.3f', cmap='rocket_r',
-                        xticklabels=short_names, yticklabels=short_names, linewidths=0.3)
-            ax['K'].set_title("K. Cramér's V", fontweight='bold')
+            # K. Cramer's V
+            sns.heatmap(self.results['cramers_v'], ax=ax['K'], annot=True, annot_kws={"size": 4}, fmt='.3f', cmap='rocket_r',
+                        xticklabels=short_names, yticklabels=short_names, linewidths=0.3, cbar=False)
+            ax['K'].set_title("k. Cramér's V (Association)")
 
+            # L. Diagnostic Text Summary Panel
             ax['L'].axis('off')
             summary_lines = (
-                f"FORENSIC SUMMARY — n = {self.n_samples:,}\nDuplicates: {self.results['duplicates']} | Max MI: {max(self.results['mi_joint']):.4f}")
-            ax['L'].text(0.5, 0.5, summary_lines, ha='center', va='center', fontsize=14, family='monospace',
+                f"FORENSIC SUMMARY — n = {self.n_samples:,}\n"
+                f"Duplicates: {self.results['duplicates']} | Max Joint-MI: {max(self.results['mi_joint']):.4f}"
+            )
+            ax['L'].text(0.5, 0.5, summary_lines, ha='center', va='center', fontsize=6, family='monospace',
                          transform=ax['L'].transAxes)
 
-            plt.savefig(f'forensic_audit_{self.split_name.lower()}.png', dpi=300, bbox_inches='tight')
-            print(f"\n[✓] Audit figure saved: forensic_audit_{self.split_name.lower()}.png")
+            # Export as highest quality vector PDF & raster PNG
+            out_pdf = f"forensic_audit_{self.split_name.lower()}.pdf"
+            out_png = f"forensic_audit_{self.split_name.lower()}.png"
+            fig.savefig(out_pdf, format="pdf", dpi=FIGURE_DPI, bbox_inches="tight")
+            fig.savefig(out_png, format="png", dpi=FIGURE_DPI, bbox_inches="tight")
+            print(f"[✓] Vector PDF Saved  → {out_pdf}")
+            print(f"[✓] Raster PNG Saved  → {out_png}")
             plt.close(fig)
         except Exception as e:
-            print(f"\n[!] Could not generate plots: {e}")
+            print(f"\n[!] Failed to generate publication-quality figures: {e}")
+            import traceback
+            traceback.print_exc()
         finally:
-            # Ensure figures are closed and memory is freed even if plotting fails
             plt.close('all')
             gc.collect()
 
 
 # ============================================================
-# EXECUTION WRAPPER
+# AUDIT EXECUTION WRAPPER
 # ============================================================
-def execute_forensic_audit(train_dataset, val_dataset, test_dataset):
+def execute_forensic_audit(train_dataset: Any, val_dataset: Any, test_dataset: Any, chunk_size: int = 2000) -> None:
+    """Executes a sequentially isolated forensic verification pass over all datasets."""
     print("\n" + "=" * 65)
-    print("  EXECUTING FORENSIC DATASET AUDIT (Memory-Optimized)")
+    print("  EXECUTING FORENSIC DATASET AUDIT")
     print("=" * 65)
 
-    # Perform leakage audit first, as it needs all datasets
-    auditor_for_leakage = ForensicDatasetAuditor(train_dataset, split_name="Train")
+    auditor_for_leakage = ForensicDatasetAuditor(train_dataset, split_name="Train", chunk_size=chunk_size)
     leakage = auditor_for_leakage.audit_cross_split_leakage({'Val': val_dataset, 'Test': test_dataset})
 
-    # Audit leakage between Val and Test too
-    auditor_val_leakage = ForensicDatasetAuditor(val_dataset, split_name="Val")
+    auditor_val_leakage = ForensicDatasetAuditor(val_dataset, split_name="Val", chunk_size=chunk_size)
     leakage_vt = auditor_val_leakage.audit_cross_split_leakage({'Test': test_dataset})
 
     total_leakage = sum(leakage.values()) + sum(leakage_vt.values())
     print(f"\n  {'=' * 50}")
-    print(f"  LEAKAGE VERDICT: {'[✓] CLEAN' if total_leakage == 0 else f'[!] CONTAMINATED ({total_leakage} overlap)'}")
+    print(f"  LEAKAGE VERDICT: {'[✓] CLEAN (Strictly Separated)' if total_leakage == 0 else f'[!] CONTAMINATED ({total_leakage} overlap nodes detected)'}")
     print(f"  {'=' * 50}")
 
-    del auditor_for_leakage, auditor_val_leakage  # Free memory after leakage check
+    del auditor_for_leakage, auditor_val_leakage
     gc.collect()
 
-    # Now, run full audits sequentially, one dataset at a time
-    print("\n[*] Generating full audit reports per split (sequentially to manage memory)...")
     for ds, name in zip([train_dataset, val_dataset, test_dataset], ["Train", "Val", "Test"]):
         print(f"\n--- Starting detailed audit for {name} split ---")
-        auditor = ForensicDatasetAuditor(ds, split_name=name)
+        auditor = ForensicDatasetAuditor(ds, split_name=name, chunk_size=chunk_size)
         auditor.generate_report()
-        del auditor  # Delete the auditor object
-        gc.collect()  # Force garbage collection
+        del auditor
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
         print(f"--- Finished detailed audit for {name} split ---\n")

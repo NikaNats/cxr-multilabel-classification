@@ -1,30 +1,27 @@
-"""
-main.py — CXR-Synapse Training & Evaluation Pipeline (Uncertainty-Gated SOTA)
-═══════════════════════════════════════════════════════════════════════════════
-Orchestrates five sequential phases:
-  1. Data preparation and ensemble training (with Hybrid Clinical Adjacency).
-  2. Evaluation setup (model loading, calibration, logit adjustment).
-  3. POST-HOC VECTOR TEMPERATURE SCALING (Fixes Focal Loss Calibration Warping).
-  4. Metrics computation and UNCERTAINTY-GATED Conformal Calibration (SOTA).
-  5. Publication-quality figure generation and quantitative forensic reporting.
-"""
+from __future__ import annotations
 
 import gc
 import warnings
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import torch
 import torch.nn.functional as F
+from scipy.stats import shapiro, spearmanr
 from sklearn.exceptions import UndefinedMetricWarning
-from sklearn.metrics import roc_auc_score, precision_recall_curve, average_precision_score
-from scipy.stats import spearmanr, mannwhitneyu
+from sklearn.metrics import roc_auc_score
 
 warnings.filterwarnings("ignore", category=UndefinedMetricWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
 
-from config import DEVICE, EXPERIMENT_NAME, EXPERIMENT_ID
+from config import (
+    DEVICE,
+    EXPERIMENT_ID,
+    EXPERIMENT_NAME,
+    format_ascii_histogram,
+    log_clinical_report,
+    log_process,
+)
 from data import get_dataloaders
 from evaluators import DeepEnsembleTTAEvaluator, validate
 from model import CXR_Synapse_Foundation
@@ -32,33 +29,29 @@ from train import train_ensemble
 from utils import (
     CHESTMNIST_CLASS_NAMES,
     RADLEX_PATHOLOGIES,
-    UncertaintyGatedAdaptiveConformalPredictor, # Updated: SOTA Gated Predictor
+    UncertaintyGatedAdaptiveConformalPredictor,
     bootstrap_metric_ci,
-    build_cooccurrence_adjacency,
-    build_hybrid_clinical_adjacency,      
-    compute_logit_adjustment,
+    build_hybrid_clinical_adjacency,
     ensure_radlex_embeddings,
+    expected_calibration_error,
+    format_apa_correlation,
+    format_apa_p_value,
     optimise_thresholds,
     paired_bootstrap_metric_test,
     select_adjacency_threshold,
-    expected_calibration_error
 )
 from visualizer import (
-    configure_nature_style,       
+    configure_nature_style,
     plot_conformal_tradeoff,
-    plot_diagnostic_suite,        
-    plot_paq_attention,           
+    plot_diagnostic_suite,
     plot_semantic_manifold,
 )
 
-# Output directory for all generated figures
 FIGURE_DIR = f"figures_{EXPERIMENT_ID}"
 
 
 def _safe_macro_auc(y_true: np.ndarray, y_pred: np.ndarray) -> float:
-    """
-    Macro-averaged AUROC that skips label-sparse classes.
-    """
+    """Computes the macro-averaged Area Under the ROC Curve safely across classes."""
     per_class_aucs = []
     for i in range(y_true.shape[1]):
         if len(np.unique(y_true[:, i])) > 1:
@@ -69,27 +62,27 @@ def _safe_macro_auc(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     return float(np.mean(per_class_aucs)) if per_class_aucs else 0.5
 
 
-def calibrate_probabilities(probs: np.ndarray, labels: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def calibrate_probabilities(
+    probs: np.ndarray, labels: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
     """
-    SOTA Vector Temperature Scaling for Multi-Label Probabilities.
-    Optimizes a class-specific temperature vector T (14-dimensional) via L-BFGS.
-    Completely flattens the Expected Calibration Error (ECE) of all classes to SOTA levels (<1.5%).
+    Applies multi-dimensional Vector Temperature Scaling using L-BFGS optimization.
+    Calibrates logits to align belief masses with empirical probability spaces.
     """
     eps = 1e-6
-    # Map probabilities back to logit space mathematically
-    logits = np.log(np.clip(probs, eps, 1.0 - eps) / (1.0 - np.clip(probs, eps, 1.0 - eps)))
+    logits = np.log(
+        np.clip(probs, eps, 1.0 - eps) / (1.0 - np.clip(probs, eps, 1.0 - eps))
+    )
     
     logits_t = torch.from_numpy(logits).float().to(DEVICE)
     labels_t = torch.from_numpy(labels).float().to(DEVICE)
     
-    # SOTA FIX: Create a proper leaf Tensor by enabling requires_grad_() AFTER the multiplication operation
     t = (torch.ones(14, device=DEVICE) * 1.5).requires_grad_()
     optimizer = torch.optim.LBFGS([t], lr=0.01, max_iter=200)
     
-    def closure():
+    def closure() -> torch.Tensor:
         optimizer.zero_grad()
         t_clamp = t.clamp(min=0.1, max=5.0)
-        # PyTorch automatically broadcasts the division (B, 14) / (14,) element-wise
         loss = F.binary_cross_entropy_with_logits(logits_t / t_clamp, labels_t)
         loss.backward()
         return loss
@@ -97,42 +90,58 @@ def calibrate_probabilities(probs: np.ndarray, labels: np.ndarray) -> tuple[np.n
     optimizer.step(closure)
     t_opt = t.clamp(min=0.1, max=5.0).detach().cpu().numpy()
     
-    # Recalculate perfectly calibrated class-specific probabilities
     cal_probs = 1.0 / (1.0 + np.exp(-logits / t_opt))
     return cal_probs, t_opt
 
 
-def run_forensic_visual_audit(test_labels, test_preds, conformal_sets, test_epistemic, val_probs, val_labels, opt_thresholds):
-    """
-    Forensic Console Auditor.
-    """
-    print(f"\n{'=' * 75}\n  FORENSIC VISUAL AUDIT REPORT (Numerical Counterparts of Figures)\n{'=' * 75}")
+def run_forensic_visual_audit(
+    test_labels: np.ndarray,
+    test_preds: np.ndarray,
+    conformal_sets: np.ndarray,
+    test_epistemic: np.ndarray,
+    val_probs: np.ndarray,
+    val_labels: np.ndarray,
+    opt_thresholds: np.ndarray,
+) -> None:
+    """Generates a detailed forensic visual audit report of the uncertainty dynamics."""
+    audit_report = []
 
     # --- Audit of Panel C: Uncertainty vs. Conformal Set Size ---
     set_sizes = conformal_sets.sum(axis=1)
     corr, p_val = spearmanr(test_epistemic, set_sizes)
-    print(f"  [Panel C] Uncertainty vs. Set Size Correlation:")
-    print(f"    - Spearman ρ: {corr:.4f} (p-value: {p_val:.2e})")
+    audit_report.append("[Panel C] Uncertainty vs. Set Size Correlation:")
+    audit_report.append(
+        f"  - Spearman ρ: {format_apa_correlation(corr)} "
+        f"(p-value: {format_apa_p_value(p_val)})"
+    )
 
     # --- Audit of Panel E: Conformal Set Size Distribution ---
     unique_sizes, counts = np.unique(set_sizes, return_counts=True)
-    print(f"\n  [Panel E] Prediction Set Size Distribution:")
+    audit_report.append("\n[Panel E] Prediction Set Size Distribution:")
     for sz, cnt in zip(unique_sizes, counts):
-        print(f"    - Set Size {sz}: {cnt:4d} patients ({cnt/len(set_sizes):.1%})")
+        audit_report.append(
+            f"  - Set Size {sz}: {cnt:4d} patients ({cnt / len(set_sizes):.1%})"
+        )
 
     # --- Audit of Panel F: Uncertainty by Error Profile ---
     mae = np.abs(test_preds - test_labels).mean(axis=1)
     median_mae = np.median(mae)
     low_error_unc = test_epistemic[mae <= median_mae]
     high_error_unc = test_epistemic[mae > median_mae]
-    print(f"\n  [Panel F] Epistemic Uncertainty by Error Profile:")
-    print(f"    - Low Error Cohort Mean Uncertainty : {low_error_unc.mean():.6f}")
-    print(f"    - High Error Cohort Mean Uncertainty: {high_error_unc.mean():.6f}")
+    audit_report.append("\n[Panel F] Epistemic Uncertainty by Error Profile:")
+    audit_report.append(
+        f"  - Low Error Cohort Mean Uncertainty : {low_error_unc.mean():.6f}"
+    )
+    audit_report.append(
+        f"  - High Error Cohort Mean Uncertainty: {high_error_unc.mean():.6f}"
+    )
 
     # --- Audit of Panel I: Selective Classification (Abstention) ---
     rejection_order = np.argsort(test_epistemic)[::-1]
     rejection_rates = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5]
-    print(f"\n  [Panel I] Uncertainty-Informed Selective Classification (AUROC):")
+    audit_report.append(
+        "\n[Panel I] Uncertainty-Informed Selective Classification (AUROC):"
+    )
     for r in rejection_rates:
         num_rejected = int(len(test_epistemic) * r)
         kept_idx = rejection_order[num_rejected:]
@@ -140,116 +149,64 @@ def run_forensic_visual_audit(test_labels, test_preds, conformal_sets, test_epis
         class_aucs = []
         for i in range(test_labels.shape[1]):
             if len(np.unique(test_labels[kept_idx, i])) > 1:
-                class_aucs.append(roc_auc_score(test_labels[kept_idx, i], test_preds[kept_idx, i]))
+                class_aucs.append(
+                    roc_auc_score(test_labels[kept_idx, i], test_preds[kept_idx, i])
+                )
         macro_auc = np.mean(class_aucs) if class_aucs else 0.5
-        print(f"    - Reject {r*100:2.0f}% Hard Cases -> Retained Macro-AUROC: {macro_auc:.4f}")
+        audit_report.append(
+            f"  - Reject {r * 100:2.0f}% Hard Cases -> "
+            f"Retained Macro-AUROC: {macro_auc:.4f}"
+        )
 
-    # --- Audit of Panel L: Top Error Correlations ---
-    residuals = test_labels.astype(float) - test_preds
-    corr_matrix = np.nan_to_num(np.corrcoef(residuals, rowvar=False), nan=0.0)
-    flat_corrs = []
-    for i in range(len(CHESTMNIST_CLASS_NAMES)):
-        for j in range(i + 1, len(CHESTMNIST_CLASS_NAMES)):
-            flat_corrs.append(((CHESTMNIST_CLASS_NAMES[i], CHESTMNIST_CLASS_NAMES[j]), corr_matrix[i, j]))
-    sorted_corrs = sorted(flat_corrs, key=lambda x: abs(x[1]), reverse=True)
-    print(f"\n  [Panel L] Top-3 Strongest Comorbidity Error Correlations (Residuals):")
-    for (c1, c2), val in sorted_corrs[:3]:
-        print(f"    - {c1:<15} <-> {c2:<15} | Correlation: {val:+.4f}")
-
-    # --- Audit of Panel N: Top Empirical Comorbidities ---
-    co = test_labels.T @ test_labels
-    p_row_col = co / np.maximum(np.diag(co), 1)
-    flat_comorb = []
-    for i in range(len(CHESTMNIST_CLASS_NAMES)):
-        for j in range(len(CHESTMNIST_CLASS_NAMES)):
-            if i != j and p_row_col[i, j] > 0.05:
-                flat_comorb.append(((CHESTMNIST_CLASS_NAMES[i], CHESTMNIST_CLASS_NAMES[j]), p_row_col[i, j]))
-    sorted_comorb = sorted(flat_comorb, key=lambda x: x[1], reverse=True)
-    print(f"\n  [Panel N] Top-3 Strongest Clinical Comorbidities P(Row | Col):")
-    for (c1, c2), val in sorted_comorb[:3]:
-        print(f"    - P({c1:<15} | {c2:<15}) = {val:.1%}")
-
-    # --- Audit of Panel O: Epistemic Entropy Gap ---
-    has_disease = test_labels.sum(axis=1) > 0
-    stat, mwu_p = mannwhitneyu(test_epistemic[has_disease], test_epistemic[~has_disease], alternative='two-sided')
-    print(f"\n  [Panel O] Epistemic Entropy Gap (Diseased vs. Healthy):")
-    print(f"    - Diseased Mean Uncertainty : {test_epistemic[has_disease].mean():.6f}")
-    print(f"    - Healthy Mean Uncertainty  : {test_epistemic[~has_disease].mean():.6f}")
-    print(f"    - Mann-Whitney U Test p-val: {mwu_p:.2e}")
-
-    # --- Audit of Conformal Tradeoff Curve (Fig 4b) ---
-    print(f"\n  [Fig 4b] Conformal Safety-Efficiency Reference Points:")
-    alphas_ref = [0.05, 0.10, 0.20, 0.30]
-    val_true = val_labels.astype(bool)
-    total_true = max(val_true.sum(), 1)
-    for alpha in alphas_ref:
-        best_m = 0.001
-        for m in np.linspace(2.0, 0.001, 500):
-            adjusted = np.clip(opt_thresholds * m, 1e-4, 0.9999)
-            if ((val_probs >= adjusted) & val_true).sum() / total_true >= 1.0 - alpha:
-                best_m = m; break
-        final_sets = val_probs >= np.clip(opt_thresholds * best_m, 1e-4, 0.9999)
-        cov = (final_sets & val_true).sum() / total_true
-        sz = final_sets.sum(axis=1).mean()
-        print(f"    - Target α: {alpha:.2f} -> Empirical Coverage: {cov:.1%} | Mean Set Size: {sz:.2f}")
+    log_clinical_report(
+        "audit", "Forensic Visual Audit Analysis", "\n".join(audit_report)
+    )
 
 
 def main() -> None:
-    configure_nature_style()   # apply Nature rcParams before any plotting
+    """Executes the complete end-to-end training and evaluation pipeline."""
+    configure_nature_style()
 
-    print(
-        f"\n{'=' * 75}\n"
-        f"  Starting {EXPERIMENT_NAME}\n"
-        f"  RUN ID: {EXPERIMENT_ID}\n"
-        f"{'=' * 75}"
-    )
+    log_process("main", "pipeline_started", name=EXPERIMENT_NAME, run_id=EXPERIMENT_ID)
 
-    # ══════════════════════════════════════════════════════════════════════════
-    # PHASE 1 — DATA PREPARATION & ENSEMBLE TRAINING
-    # ══════════════════════════════════════════════════════════════════════════
-    print("\n[*] Loading training DataLoaders …")
+    # PHASE 1 — DATA PREPARATION
     train_emb_dataset, train_loader, val_loader, _, num_workers = get_dataloaders()
+    train_labels_np = train_emb_dataset.labels.numpy().astype(np.float32)
+    priors = np.mean(train_labels_np, axis=0)
+    priors = np.clip(priors, 1e-4, 1.0 - 1e-4)
 
-    train_labels_np = train_emb_dataset.labels.numpy().astype(np.int32)
-    adj_threshold   = select_adjacency_threshold(train_labels_np, num_classes=14)
+    adj_threshold = select_adjacency_threshold(train_labels_np, num_classes=14)
     
-    # SOTA FIX: Load RadLex embeddings FIRST in Phase 1 so we can build the Hybrid Clinical Adjacency Matrix
-    print("[*] Acquiring clinical BioViL-T text embeddings for hybrid graph topology...")
     radlex_embeddings = ensure_radlex_embeddings(
-        "radlex_embeddings_14.pth", RADLEX_PATHOLOGIES,
-        "microsoft/BiomedVLP-BioViL-T", DEVICE,
+        "radlex_embeddings_14.pth",
+        RADLEX_PATHOLOGIES,
+        "microsoft/BiomedVLP-BioViL-T",
+        DEVICE,
     )
     
-    # Construct the Hybrid Adjacency Graph (70% Empirical + 30% Textbook Clinical Ontology)
-    print("[*] Constructing SOTA Hybrid Ontological-Empirical Pathology Graph...")
-    adj_norm = build_hybrid_clinical_adjacency(train_labels_np, radlex_embeddings, 14, adj_threshold, True)
+    adj_norm = build_hybrid_clinical_adjacency(
+        train_labels_np, radlex_embeddings, 14, adj_threshold, True
+    )
 
+    # Ensemble training
     ensemble_checkpoints = train_ensemble(
         [42, 43, 44], adj_norm, train_emb_dataset, train_loader, val_loader, num_workers
     )
 
-    # Free GPU memory before deep inference begins
     del train_loader, val_loader, train_emb_dataset
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
 
-    # ══════════════════════════════════════════════════════════════════════════
     # PHASE 2 — EVALUATION SETUP
-    # ══════════════════════════════════════════════════════════════════════════
-    print("\n[*] Refreshing DataLoaders for evaluation …")
     _, _, eval_val_loader, eval_test_loader, _ = get_dataloaders()
 
-    print("[*] Loading model for calibration …")
     pro_model = CXR_Synapse_Foundation(num_classes=14).to(DEVICE)
     pro_model.set_adjacency_mask(adj_norm)
     pro_model.set_radlex_embeddings(radlex_embeddings)
+    pro_model.set_priors(priors)
 
-    logit_adj_vec = compute_logit_adjustment(train_labels_np, tau=1.0).to(DEVICE)
-    pro_model.set_logit_prior(logit_adj_vec.cpu().numpy())
-
-    # Load the last ensemble checkpoint as a single-model baseline
-    raw_state  = torch.load(
+    raw_state = torch.load(
         ensemble_checkpoints[-1], map_location=DEVICE, weights_only=True
     )
     clean_state = {
@@ -260,89 +217,156 @@ def main() -> None:
     pro_model.load_state_dict(clean_state, strict=False)
     pro_model.eval()
 
-    # ══════════════════════════════════════════════════════════════════════════
-    # PHASE 3 — METRICS & CONFORMAL CALIBRATION (WITH POST-HOC CALIBRATION)
-    # ══════════════════════════════════════════════════════════════════════════
-    print("\n[*] Optimising per-class thresholds on validation set …")
-    _, _, _, raw_val_probs, val_labels, val_class_aucs = validate(
-        pro_model, eval_val_loader, DEVICE
-    )
-    
-    # SOTA FIX: Run Bayesian Ensemble on validation set to extract true unshifted uncertainties
-    print("[*] Generating prior-free validation uncertainties for selective CP gating...")
+    # PHASE 3 — METRICS & CONFORMAL CALIBRATION
+    # 1. Uncalibrated validation evaluation
     val_ensemble_evaluator = DeepEnsembleTTAEvaluator(
-        model_class=CXR_Synapse_Foundation, checkpoint_paths=ensemble_checkpoints,
-        device_=DEVICE, adj_norm_np=adj_norm, num_mc_passes=10, logit_adj=logit_adj_vec
-    )
-    val_ensemble_results = val_ensemble_evaluator.evaluate(eval_val_loader, thresholds=None)
-    
-    raw_val_probs_ens = val_ensemble_results["predictive_mean"]
-    val_uncertainties  = val_ensemble_results["epistemic_variance"]
-    
-    # Post-hoc calibrate validation probabilities using Temperature Scaling
-    print("[*] Calibrating validation probabilities via post-hoc Temperature Scaling...")
-    val_probs, opt_temperature = calibrate_probabilities(raw_val_probs_ens, val_labels)
-    print(f"    - Optimal Calibration Temperature Vector (T):\n{opt_temperature}")
-    
-    opt_thresholds = optimise_thresholds(val_probs, val_labels)
-
-    print("[*] Single-model baseline evaluation …")
-    base_auc, base_f1, _, raw_base_preds, base_labels, _ = validate(
-        pro_model, eval_test_loader, DEVICE
-    )
-    # Scale baseline predictions with optimal temperature vector
-    eps = 1e-6
-    base_logits = np.log(np.clip(raw_base_preds, eps, 1.0 - eps) / (1.0 - np.clip(raw_base_preds, eps, 1.0 - eps)))
-    base_preds = 1.0 / (1.0 + np.exp(-base_logits / opt_temperature))
-
-    print("[*] Bayesian ensemble evaluation (TTA + MC-dropout) …")
-    raw_ensemble_results = DeepEnsembleTTAEvaluator(
         model_class=CXR_Synapse_Foundation,
         checkpoint_paths=ensemble_checkpoints,
         device_=DEVICE,
         adj_norm_np=adj_norm,
         num_mc_passes=10,
-        logit_adj=logit_adj_vec,
+        priors=priors,
+    )
+    val_ensemble_results = val_ensemble_evaluator.evaluate(
+        eval_val_loader, thresholds=None
+    )
+    
+    raw_val_probs_ens = val_ensemble_results["predictive_mean"]
+    val_uncertainties  = val_ensemble_results["epistemic_variance"]
+    val_labels = val_ensemble_results["labels"]
+    
+    # Extract baseline validation class-specific performance for conformal weighting
+    _, _, _, _, _, val_class_aucs = validate(
+        pro_model, eval_val_loader, DEVICE, priors=priors
+    )
+    
+    # 2. Vector Temperature calibration
+    val_probs, opt_temperature = calibrate_probabilities(raw_val_probs_ens, val_labels)
+    log_process(
+        "calibration",
+        "vector_temperature_scaling_completed",
+        mean_temp=f"{opt_temperature.mean():.4f}",
+        std_temp=f"{opt_temperature.std():.4f}",
+    )
+
+    opt_thresholds = optimise_thresholds(val_probs, val_labels)
+    
+    # Log optimized decision thresholds nicely
+    thr_report = "\n".join(
+        f"  - {ch:<18}: {t:.4f}" for ch, t in zip(CHESTMNIST_CLASS_NAMES, opt_thresholds)
+    )
+    log_clinical_report(
+        "calibration", "Optimized Class Decision Thresholds", thr_report
+    )
+
+    # 3. Calibrated single-model baseline test evaluation
+    _, _, _, raw_base_preds, base_labels, _ = validate(
+        pro_model, eval_test_loader, DEVICE, priors=priors
+    )
+    eps = 1e-6
+    base_logits = np.log(
+        np.clip(raw_base_preds, eps, 1.0 - eps)
+        / (1.0 - np.clip(raw_base_preds, eps, 1.0 - eps))
+    )
+    base_preds = 1.0 / (1.0 + np.exp(-base_logits / opt_temperature))
+
+    # 4. Calibrated Ensemble Test Evaluation (Jensen-safe)
+    ensemble_results = DeepEnsembleTTAEvaluator(
+        model_class=CXR_Synapse_Foundation,
+        checkpoint_paths=ensemble_checkpoints,
+        device_=DEVICE,
+        adj_norm_np=adj_norm,
+        num_mc_passes=10,
+        priors=priors,
+        temperature=opt_temperature,
     ).evaluate(eval_test_loader, thresholds=opt_thresholds)
 
-    # Scale ensemble predictions with optimal temperature to resolve Focal Loss warping
-    raw_test_preds = raw_ensemble_results["predictive_mean"]
-    test_logits = np.log(np.clip(raw_test_preds, eps, 1.0 - eps) / (1.0 - np.clip(raw_test_preds, eps, 1.0 - eps)))
-    test_preds = 1.0 / (1.0 + np.exp(-test_logits / opt_temperature))
-    
-    test_labels    = raw_ensemble_results["labels"]
-    test_epistemic = raw_ensemble_results["epistemic_variance"]
+    test_preds = ensemble_results["predictive_mean"]
+    test_labels = ensemble_results["labels"]
+    test_epistemic = ensemble_results["epistemic_variance"]
 
-    print("[*] Bootstrapping 95 % confidence intervals (N = 2 000) …")
+    # --------------------------------------------------------
+    # AUTOMATED STATISTICAL ASSUMPTION CHECKING
+    # --------------------------------------------------------
+    stat_report = []
+    stat_report.append("Verifying statistical assumptions for paired hypotheses testing...")
+    residuals = test_preds.flatten() - base_preds.flatten()
+    
+    # Sample 2000 points to prevent Shapiro-Wilk sample size inflation
+    rng_test = np.random.RandomState(42)
+    res_sample = rng_test.choice(residuals, 2000, replace=False)
+    shapiro_stat, shapiro_p = shapiro(res_sample)
+    
+    stat_report.append(
+        f"  - Shapiro-Wilk normality of residuals: W = {shapiro_stat:.4f}, "
+        f"p = {format_apa_p_value(shapiro_p)}"
+    )
+    if shapiro_p < 0.05:
+        stat_report.append(
+            "  - [DECISION] Residual normality rejected (p < .05). "
+            "Parametric paired t-test is invalid."
+        )
+        stat_report.append(
+            "  - [DECISION] Paired non-parametric bootstrap test is mathematically "
+            "justified."
+        )
+    else:
+        stat_report.append("  - [DECISION] Residual normality accepted.")
+
     ens_ci = bootstrap_metric_ci(_safe_macro_auc, test_labels, test_preds)
-    sig    = paired_bootstrap_metric_test(
+    sig = paired_bootstrap_metric_test(
         _safe_macro_auc, test_labels, test_preds, base_preds
     )
-
-    # SOTA FIX: Calibrate the Gated Conformal Predictor (Exclude top 10% hardest cases)
-    print("\n[*] Calibrating SOTA Uncertainty-Gated Conformal Predictor (90 % marginal coverage) …")
-    conformal_predictor = UncertaintyGatedAdaptiveConformalPredictor(alpha=0.10, rejection_quantile=0.10)
-    conformal_predictor.calibrate(val_probs, val_labels, opt_thresholds, val_class_aucs, val_uncertainties)
-
-    conformal_res   = conformal_predictor.predict_sets(test_preds, test_epistemic)
-    conformal_sets  = conformal_res["include_pos"]
-    accepted_mask   = conformal_res["accepted"]
     
-    # Calculate safety metrics strictly on accepted (non-gated) patient population
-    true_positives  = test_labels.astype(bool)
-    per_class_cover = (
-        (conformal_sets[accepted_mask] & true_positives[accepted_mask]).sum(axis=0)
-        / np.maximum(true_positives[accepted_mask].sum(axis=0), 1)
+    stat_report.append("\nHypothesis Testing & Confidence Intervals:")
+    stat_report.append(
+        f"  - Ensemble Macro-AUROC: {_safe_macro_auc(test_labels, test_preds):.4f}"
     )
+    stat_report.append(
+        f"  - 95% Bootstrap CI     : [{ens_ci['ci_low']:.4f}, {ens_ci['ci_high']:.4f}]"
+    )
+    stat_report.append(
+        f"  - Paired ΔAUROC Test  : p-value = {format_apa_p_value(sig['p_value'])}"
+    )
+    
+    log_clinical_report(
+        "stats", "Statistical Validation & Assumptions", "\n".join(stat_report)
+    )
+
+    # 5. Calibrate the Gated Conformal Predictor
+    conformal_predictor = UncertaintyGatedAdaptiveConformalPredictor(
+        alpha=0.10, rejection_quantile=0.10
+    )
+    conformal_predictor.calibrate(
+        val_probs, val_labels, opt_thresholds, val_class_aucs, val_uncertainties
+    )
+
+    conformal_res = conformal_predictor.predict_sets(test_preds, test_epistemic)
+    conformal_sets = conformal_res["include_pos"]
+    accepted_mask = conformal_res["accepted"]
+    
+    true_positives = test_labels.astype(bool)
+    
+    # Calculate patient-level clinical coverage
+    sick_mask = true_positives[accepted_mask].sum(axis=1) > 0
+    covered_patients = (
+        (
+            conformal_sets[accepted_mask][sick_mask]
+            & true_positives[accepted_mask][sick_mask]
+        ).sum(axis=1)
+        > 0
+    )
+    clinical_coverage = covered_patients.sum() / max(sick_mask.sum(), 1)
+    
+    # Calculate strict class-averaged coverage
+    per_class_cover = (conformal_sets[accepted_mask] & true_positives[accepted_mask]).sum(
+        axis=0
+    ) / np.maximum(true_positives[accepted_mask].sum(axis=0), 1)
     marginal_coverage = per_class_cover.mean()
-    mean_set_size     = conformal_sets[accepted_mask].sum(axis=1).mean()
+    mean_set_size = conformal_sets[accepted_mask].sum(axis=1).mean()
 
-    # ══════════════════════════════════════════════════════════════════════════
-    # PHASE 4 — PUBLICATION FIGURES (GENERATE WITH PERFECTED PROBABILITIES)
-    # ══════════════════════════════════════════════════════════════════════════
-    print(f"\n[*] Generating figures → {FIGURE_DIR}/")
-
-    # 4a. 15-panel diagnostic suite (combined PDF + 15 individual PDFs)
+    # PHASE 4 — PUBLICATION FIGURES
+    log_process("main", "generating_publication_figures", directory=FIGURE_DIR)
     plot_diagnostic_suite(
         test_labels=test_labels,
         test_preds=test_preds,
@@ -353,7 +377,6 @@ def main() -> None:
         output_dir=FIGURE_DIR,
     )
 
-    # 4b. Conformal safety–efficiency trade-off curve
     plot_conformal_tradeoff(
         val_probs=val_probs,
         val_labels=val_labels,
@@ -362,13 +385,12 @@ def main() -> None:
         output_dir=FIGURE_DIR,
     )
 
-    # 4c. LISA latent space manifold (t-SNE)
-    print("[*] Collecting latent features for manifold visualisation …")
-    feature_batches: list[np.ndarray] = []
+    # Semantic manifolds collection
+    feature_batches = []
     with torch.no_grad():
         for feats, _ in eval_test_loader:
             B = feats.shape[0]
-            proj   = pro_model.dim_reduction(feats.view(B, -1, feats.shape[-1]).to(DEVICE))
+            proj = pro_model.dim_reduction(feats.view(B, -1, 1376).to(DEVICE))
             pooled = proj.mean(dim=1).cpu().numpy()   
             feature_batches.append(pooled)
 
@@ -380,9 +402,7 @@ def main() -> None:
         output_dir=FIGURE_DIR,
     )
 
-    # ══════════════════════════════════════════════════════════════════════════
-    # PHASE 5 — REPORTING, AUDIT & PERSISTENCE
-    # ══════════════════════════════════════════════════════════════════════════
+    # PHASE 5 — FORENSIC REPORTING
     run_forensic_visual_audit(
         test_labels=test_labels,
         test_preds=test_preds,
@@ -390,57 +410,50 @@ def main() -> None:
         test_epistemic=test_epistemic,
         val_probs=val_probs,
         val_labels=val_labels,
-        opt_thresholds=opt_thresholds
+        opt_thresholds=opt_thresholds,
     )
 
-    print("\n[*] PATHOLOGY PERFORMANCE REPORT")
-    print("-" * 65)
-    print(f"{'Pathology':<25} | {'AUROC':<10} | {'Threshold':<10}")
-    print("-" * 65)
+    ascii_hist = format_ascii_histogram(
+        test_epistemic, bins=10, title="Epistemic Uncertainty Distribution"
+    )
+    log_clinical_report("eval", "Epistemic Uncertainty ASCII Distribution", ascii_hist)
 
-    for i, name in enumerate(CHESTMNIST_CLASS_NAMES):
-        try:
-            if len(np.unique(test_labels[:, i])) > 1:
-                auroc_str = f"{roc_auc_score(test_labels[:, i], test_preds[:, i]):.4f}"
-            else:
-                auroc_str = "Sparse"
-        except ValueError:
-            auroc_str = "NaN"
-        print(f"{name:<25} | {auroc_str:<10} | {opt_thresholds[i]:.4f}")
-
-    print("-" * 65)
-    print(f"Mean epistemic uncertainty: {test_epistemic.mean():.6f}")
-
-    # Re-calculate perfectly calibrated ECE for summary reporting
     cal_ece = expected_calibration_error(test_preds, test_labels)
 
-    summary_df = pd.DataFrame({
-        "Metric": [
-            "Macro AUROC", "AUROC 95 % CI", "ΔAUROC p-value",
-            "Macro F1", "Mean ECE", "Conformal coverage", "Mean set size",
-        ],
-        "Value": [
-            f"{_safe_macro_auc(test_labels, test_preds):.4f}",
-            f"[{ens_ci['ci_low']:.4f}, {ens_ci['ci_high']:.4f}]",
-            f"{sig['p_value']:.4g}",
-            f"{raw_ensemble_results['f1']:.4f}",
-            f"{cal_ece.mean():.4f}", # Post-hoc calibrated ECE!
-            f"{marginal_coverage:.1%}", # Corrected conformal coverage!
-            f"{mean_set_size:.2f}",
-        ],
-    })
+    summary_df = pd.DataFrame(
+        {
+            "Metric": [
+                "Macro AUROC",
+                "AUROC 95% CI",
+                "dAUROC p-value",
+                "Macro F1",
+                "Mean ECE",
+                "Class-average coverage",
+                "Patient-level coverage",
+                "Mean set size",
+            ],
+            "Value": [
+                f"{_safe_macro_auc(test_labels, test_preds):.4f}",
+                f"[{ens_ci['ci_low']:.4f}, {ens_ci['ci_high']:.4f}]",
+                f"{format_apa_p_value(sig['p_value'])}",
+                f"{ensemble_results['f1']:.4f}",
+                f"{cal_ece.mean():.4f}",
+                f"{marginal_coverage:.1%}",
+                f"{clinical_coverage:.1%}",
+                f"{mean_set_size:.2f}",
+            ],
+        }
+    )
 
-    print(f"\n{'=' * 75}")
-    print("  FINAL SCIENTIFIC SUMMARY — CXR-SYNAPSE")
-    print("=" * 75)
-    print(summary_df.to_string(index=False))
-    print("=" * 75)
+    log_clinical_report(
+        "eval",
+        f"Final Scientific Summary ({EXPERIMENT_NAME})",
+        summary_df.to_string(index=False),
+    )
 
-    # Save final synchronised model weights
     save_path = f"CXR_Synapse_Foundation_final_{EXPERIMENT_ID}.pth"
     torch.save(pro_model.state_dict(), save_path)
-    print(f"\n[✓] Model saved  → {save_path}")
-    print(f"[✓] Figures saved → {FIGURE_DIR}/")
+    log_process("main", "model_saved", path=save_path)
 
 
 if __name__ == "__main__":
