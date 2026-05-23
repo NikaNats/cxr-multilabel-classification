@@ -666,6 +666,40 @@ Average Prediction Set Size & 1.55 \\
 \end{tabular}
 \end{table}
 
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{../figures_aca07655ab7c/panel_a_aca07655ab7c.pdf}
+        \caption{}
+        \label{fig:panel_a}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{../figures_aca07655ab7c/panel_g_aca07655ab7c.pdf}
+        \caption{}
+        \label{fig:panel_g}
+    \end{subfigure}
+    \\ \vspace{0.3cm}
+    \begin{subfigure}[b]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{../figures_aca07655ab7c/panel_b_aca07655ab7c.pdf}
+        \caption{}
+        \label{fig:panel_b}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{../figures_aca07655ab7c/panel_h_aca07655ab7c.pdf}
+        \caption{}
+        \label{fig:panel_h}
+    \end{subfigure}
+    \caption{შემოთავაზებული მოდელის დიაგნოსტიკური და ალბათური მახასიათებლები: (a) მაკრო-საშუალო ROC მრუდი, AUC = 0.7916 (95\% CI: [0.7703, 0.8046]); (b) სიზუსტე-რეკოლის (Precision-Recall) მაკრო მრუდი; (c) ალბათური კალიბრაციის ბარი 15-ბინიანი სქემით; (d) კლასობრივი კალიბრაციის შეცდომის (ECE) განაწილება პათოლოგიების მიხედვით.
+    \newline \textit{Figure Description: Primary diagnostic and probabilistic characteristics of the proposed model: (a) Macro-averaged ROC curve, AUC = 0.7916 (95\% CI: [0.7703, 0.8046]); (b) Macro Precision-Recall curve; (c) Reliability diagram with 15 bins; (d) Expected Calibration Error (ECE) across 14 pathologies.}}
+    \label{fig:diagnostic_metrics_grid}
+\end{figure}
+
 \section{სტატისტიკური სარწმუნოობა და ენსამბლური უპირატესობა}
 კვლევის ერთ-ერთ მთავარ მიგნებას წარმოადგენს ევიდენციური ენსამბლის სტატისტიკური უპირატესობა ერთ-მოდელიან საბაზისო ვერსიასთან შედარებით. 2000-ჯერადი ბუთსტრაპ რესემპლინგით ჩატარებულმა დაწყვილებულმა ტესტმა აჩვენა \textbf{p-value < .001}. ეს მათემატიკურად ადასტურებს, რომ LISA და PaQ მექანიზმებით გაძლიერებული ენსამბლი არა შემთხვევით, არამედ სისტემურად აუმჯობესებს დიაგნოსტიკურ ხარისხს. 95\%-იანი ნდობის ინტერვალი [0.7703, 0.8046] მიუთითებს მოდელის მაღალ მდგრადობაზე სხვადასხვა პაციენტთა ქვეჯგუფების მიმართ.
 
@@ -673,7 +707,25 @@ Average Prediction Set Size & 1.55 \\
 
 \section{კალიბრაციის ტრიუმფი: ECE ანალიზი}
 სამედიცინო გადაწყვეტილების მხარდაჭერის სისტემისთვის კრიტიკულია ალბათური სიზუსტე. მიღებული \textbf{Mean ECE 0.1585} (15.85\%) არის ChestMNIST ბენჩმარკისთვის.
-
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.49\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{../figures_aca07655ab7c/conformal_tradeoff_aca07655ab7c.pdf}
+        \caption{}
+        \label{fig:conformal_tradeoff}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.49\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{../figures_aca07655ab7c/panel_e_aca07655ab7c.pdf}
+        \caption{}
+        \label{fig:panel_e}
+    \end{subfigure}
+    \caption{კონფორმალური რისკის კონტროლისა და ეფექტურობის ანალიზი: (a) მათემატიკური გაცვლის (Trade-off) მრუდი სამიზნე შეცდომას ($\alpha$) და პროგნოზების სიმრავლის ზომას შორის; (b) სატესტო ნიმუშების განაწილება პროგნოზების სიმრავლის ზომის (Set Size) მიხედვით. საშუალო ზომა შეადგენს 1.55-ს.
+    \newline \textit{Figure Description: Conformal risk control and efficiency analysis: (a) Trade-off curve between target risk ($\alpha$) and prediction set size; (b) Empirical set size distribution across the test cohort (Mean Set Size = 1.55, mitigating clinician alert fatigue).}}
+    \label{fig:conformal_analysis_grid}
+\end{figure}
 მიღწეული Mean ECE 0.1585 მნიშვნელოვნად აღემატება სტანდარტულ, არაკალიბრირებულ მოდელებს, რომელთა ECE, გუოს (2017) ბენჩმარკების მიხედვით, ხშირად 10-15\%-ის ფარგლებში მერყეობს. ეს ადასტურებს, რომ შემოთავაზებული მოდელის მიერ გენერირებული ალბათობები არის კლინიკურად ინტერპრეტირებადი და ეთიკურად გამართული \cite{guo2017calibration}. ეს შედეგი პირდაპირ კავშირშია ასიმეტრიული ფოკალური ევიდენციური დანაკარგის გამოყენებასთან, რომელმაც აღმოფხვრა ნეირონული ქსელებისთვის დამახასიათებელი ზე-თავდაჯერებულობის (Overconfidence) პრობლემა. დაბალი ECE ნიშნავს, რომ თუ მოდელი პროგნოზირებს პათოლოგიას 80\% ალბათობით, რეალური შემთხვევების 78.8-81.2\% mართლაც შეიცავს მოცემულ დაავადებას.
 
 კალიბრაციის პროცესში მიღებული მცირე ვარიაციები დაფარვის (Coverage) მაჩვენებელში აიხსნება ანგელოპულოსის მიერ აღწერილი ფინიტური შერჩევის ცვალებადობით. როგორც ავტორები მიუთითებენ, კალიბრაციის სეტის ზომა $n$ გავლენას ახდენს კონფორმალური განაწილების სიგანეზე, რაც ჩვენს შემთხვევაში აისახა სტაბილურ, მაგრამ არა აბსოლუტურად ფიქსირებულ 92.4\%-იან დაფარვაში.
@@ -708,6 +760,25 @@ Average Prediction Set Size & 1.55 \\
 ჩვენს მიერ მიღწეული Macro AUC 0.7916, 10\%-იანი დეცილური ქვესიმრავლის პირობებში, კონკურენტუნარიანია ბალტრუშატის (2019) მიერ სრულ ChestX-ray14 ბაზაზე მიღებულ შედეგებთან (Average AUC 0.745--0.806). ეს მიუთითებს იმაზე, რომ PaQ და LISA მექანიზმები უზრუნველყოფენ მაღალ ეფექტურობას მცირე მოცულობის მონაცემებზეც კი \cite{baltruschat2019comparison}.
 
 სენსოის (2018) მიდგომამ საშუალება მოგვცა შემოთავაზებულ მოდელში დაგვენერგა გაურკვევლობით მართული აბსტენციის ზღვარი. იმ შემთხვევებში, როდესაც გამოსახულება შეიცავს მაღალ ხმაურს ან არტაქტებს, მოდელი ავტომატურად ზრდის ეპისტემურ გაურკვევლობას. ეს კლინიკური ტრაიაჟის უმძლავრესი ინსტრუმენტია: მაღალი გაურკვევლობის მქონე შემთხვევები ავტომატურად გადაეცემა რადიოლოგს დამატებითი გადამოწმებისთვის, რაც მინიმუმამდე დაჰყავს ჩუმი ჩავარდნების (Silent Failures) რისკს \cite{sensoy2018evidential}.
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.49\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{../figures_aca07655ab7c/panel_i_aca07655ab7c.pdf}
+        \caption{}
+        \label{fig:panel_i}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.49\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{../figures_aca07655ab7c/panel_j_aca07655ab7c.pdf}
+        \caption{}
+        \label{fig:panel_j}
+    \end{subfigure}
+    \caption{კლინიკური გამოსადეგობისა და შერჩევითი კლასიფიკაციის ანალიზი: (a) მოდელის სიზუსტე-რეჟექციის მრუდი (Accuracy-Rejection Curve) საეჭვო შემთხვევების ფილტრაციისას; (b) გადაწყვეტილების მიღების დიაგნოსტიკური მრუდი (DCA) სუფთა კლინიკური სარგებლის (Net Benefit) შესაფასებლად.
+    \newline \textit{Figure Description: Clinical utility and selective classification curves: (a) Accuracy-rejection curve showing retained Macro-AUROC trajectory (20\% rejection yields a peak AUROC of 0.7933); (b) Decision Curve Analysis (DCA) showing clinical Net Benefit of the proposed model against standard benchmark policies.}}
+    \label{fig:clinical_utility_grid}
+\end{figure}
 
 \subsection{დისკრიმინაციული ძალა და LISA-ს როლი}
 Macro AUC 0.7916 მაჩვენებელი, ChestMNIST-ის 14-ლეიბლიან და უკიდურესად დისბალანსურ გარემოში, მიუთითებს მოდელის მაღალ უნარზე, მოახდინოს პათოლოგიების სწორი რანჟირება. ნაშრომის ერთ-ერთი უმთავრესი მიგნებაა ის, რომ გაყინული (Frozen) ენკოდერის პირობებშიც კი, LISA რეგულარიზაციამ აღმოფხვრა წარმოდგენების დრიფტი (Representational Drift). LISA-მ აიძულა მოდელი, შეენარჩუნებინა RadLex-ის სემანტიკური ტოპოლოგია, რამაც იშვიათ კლასებზე (მაგ. თიაქარი — Hernia, ფიბროზი — Fibrosis) F1-ქულის ზრდა განაპირობა.
@@ -822,6 +893,13 @@ d_{\text{cos}}(u, v) = 1 - \frac{u \cdot v}{\|u\|_2 \|v\|_2}
 \end{equation}
 
 densMAP ვიზუალიზაციამ (Seed: 42, $N_{\text{neighbors}} = 30$, $\text{dens\_lambda} = 2.0$) აჩვენა მკაფიო კლინიკური კლასტერიზაცია. ჯანმრთელი (პათოლოგიების გარეშე) შემთხვევები ქმნიან ერთიან მკვრივ ბირთვს, ხოლო დაავადებული შემთხვევები სემანტიკურად ნაწილდებიან პერიფერიებზე მათი კლინიკური იერარქიის შესაბამისად. ეს ვიზუალური დასტურია იმისა, რომ LISA-ს მათემატიკურმა რეგულარიზაციამ წარმატებით შეინარჩუნა რადიოლოგიური ონტოლოგიის სტრუქტურა ფიქსირებულ ლატენტურ მანიფოლდზე.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{../figures_aca07655ab7c/manifold_umap_aca07655ab7c.png}
+    \caption{LISA ლატენტური სივრცის ტოპოლოგიური პროექცია სატესტო კოჰორტაზე: მაღალგანზომილებიანი ემბედინგების ორგანზომილებიანი რედუქცია სიმკვრივის შემნახველი densMAP ალგორითმით და კოსინუსური მანძილის მეტრიკით.
+    \newline \textit{Figure Description: Latent semantic manifold topology on the test cohort: two-dimensional projection of deep features using density-preserving densMAP with cosine distance, illustrating clear spatial clustering of pathology queries away from the healthy control core.}}
+    \label{fig:densmap_projection}
+\end{figure}
 \section{Forensic Dataset Audit}
 \texttt{audit.py} მოდული ახორციელებს მონაცემთა ხარისხის სიღრმისეულ დიაგნოსტიკას სამი ძირითადი განზომილებით:
 \begin{enumerate}[leftmargin=1.6em]
@@ -1325,6 +1403,16 @@ Evaluation ფაზა მკაცრად გამიჯნულია ს
 \noindent 
 {\small კომისიის თავმჯდომარის ხელმოწერა: \rule{4.5cm}{0.4pt} \hfill თარიღი: \rule{3cm}{0.4pt}}
 
+\chapter*{დანართი №10: მოდელის მრავალკომპონენტიანი სადიაგნოსტიკო პანელი}
+\addcontentsline{toc}{chapter}{დანართი №10: მოდელის მრავალკომპონენტიანი სადიაგნოსტიკო პანელი}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth,height=0.92\textheight,keepaspectratio]{../figures_aca07655ab7c/diagnostic_suite_aca07655ab7c.pdf}
+    \caption{შემოთავაზებული მოდელის სრული 15-პანელიანი ფორენზიკური და დიაგნოსტიკური აუდიტის სქემა (Run ID: aca07655ab7c) სატესტო კოჰორტაზე.
+    \newline \textit{Figure Description: Complete 15-panel forensic and diagnostic evaluation suite for the proposed model (Run ID: aca07655ab7c) across the entire hold-out test cohort, demonstrating multi-dimensional performance guarantees.}}
+    \label{fig:complete_diagnostic_suite}
+\end{figure}
+
 \nocite{*}
 \addcontentsline{toc}{chapter}{ბიბლიოგრაფია}
 \begingroup
@@ -1332,7 +1420,7 @@ Evaluation ფაზა მკაცრად გამიჯნულია ს
 \sloppy
 \setlength{\emergencystretch}{2em}
 \bibliographystyle{plain}
-\bibliography{CXR-Synapse-Masters-Thesis}
+\bibliography{proposed_model_thesis}
 \endgroup
 
 \end{document}
