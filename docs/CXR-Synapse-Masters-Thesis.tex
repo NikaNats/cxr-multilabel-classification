@@ -177,12 +177,12 @@
 % -------------------------
 \chapter*{ანოტაცია}
 \addcontentsline{toc}{chapter}{ანოტაცია}
-გულ-მკერდის რენტგენოგრამების (CXR) მრავალლეიბლიანი კლასიფიკაცია თანამედროვე სამედიცინო ხელოვნური ინტელექტის ერთ-ერთ მთავარ გამოწვევას წარმოადგენს. ძირითად პრობლემებს შორისაა კლასთა უკიდურესი დისბალანსი, წარმოდგენების დრიფტი (Representational Drift) და გაყინული ვიზუალური მოდელების ზე-თავდაჯერებულობა (Overconfidence). წინამდებარე ნაშრომში წარმოდგენილია \textbf{შეთავაზებული მეთოდი} — კლინიკურად ორიენტირებული არქიტექტურა, რომელიც პირველად აერთიანებს LISA (Language\-Invariant Semantic Anchoring) რეგულარიზაციას BioViL-T ემბედინგებით, PaQ (Pathology-as-Query) სივრცით ყურადღების მექანიზმს 2D ანატომიური პოზიციონირებით და ბეტა-ევიდენციურ ლოგიკას ეპისტემური გაურკვევლობის რაოდენობრივი შეფასებისთვის.
+გულ-მკერდის რენტგენოგრამების (CXR) მრავალნიშნიანი კლასიფიკაცია თანამედროვე სამედიცინო ხელოვნური ინტელექტის ერთ-ერთ უმნიშვნელოვანეს გამოწვევას წარმოადგენს. ძირითად პრობლემებს შორისაა მონაცემთა კლასობრივი დისბალანსი, რეპრეზენტაციული დრიფტი (Representational Drift) და გაყინული ვიზუალური ფონდური მოდელების ტენდენცია გადაჭარბებული თავდაჯერებულობისკენ (Overconfidence). წინამდებარე ნაშრომში წარმოდგენილია \textbf{შემოთავაზებული მოდელი} — კლინიკურად ორიენტირებული არქიტექტურა, რომელიც პირველად აერთიანებს LISA (Language-Invariant Semantic Anchoring) რეგულარიზაციას BioViL-T ენობრივი პრიორებით, PaQ (Pathology-as-Query) სივრცითი ჯვარედინი ყურადღების (Cross-Attention) მექანიზმს ორგანზომილებიანი სინუს-კოსინუსური პოზიციური ემბედინგებით და ბინომიალურ სუბიექტურ ლოგიკას ეპისტემური გაურკვევლობის ზუსტი რაოდენობრივი დეკუპლირებისთვის.
 
-ჩატარებულმა ექსპერიმენტებმა ChestMNIST მონაცემთა ბაზაზე აჩვენა, რომ შემოთავაზებული მეთოდი არღვევს ტრადიციულ რეპრეზენტაციულ ბარიერებს და აღწევს მრავალლეიბლიან AUC 0.7913-ს. უმთავრესი მეცნიერული მიღწევაა მოდელის სრულყოფილი კალიბრაცია, რისი დადასტურებაცაა რეკორდულად დაბალი შეცდომის მაჩვენებელი — ECE 0.0120. ნაშრომში ასევე ინტეგრირებულია Micro-Marginal კონფორმალური რისკის კონტროლი; საბოლოო კოდში რეპორტირებული მაჩვენებელი არის კლასთა საშუალო კონფორმალური დაფარვა 92.4\%, რაც მათემატიკურად ამცირებს ჭეშმარიტი პათოლოგიის გამოტოვების რისკს. შედეგების ვალიდურობა დადასტურებულია 2000-ჯერადი Bootstrap რესემპლინგითა და MD5 ბიტ-ზუსტი ფორენზიკული აუდიტით. აღნიშნული სტატისტიკურად სარწმუნო (p=0.000) არქიტექტურა ქმნის მყარ საფუძველს Trustworthy AI სისტემების კლინიკურ პრაქტიკაში უსაფრთხოდ დასანერგად.
+ჩატარებულმა ექსპერიმენტებმა ChestMNIST მონაცემთა ბაზაზე აჩვენა, რომ შემოთავაზებული მოდელი წარმატებით არღვევს ტრადიციულ რეპრეზენტაციულ ბარიერებს და აღწევს მრავალლეიბლიან AUC 0.7913-ს. უმთავრეს სამეცნიერო მიღწევას წარმოადგენს მოდელის ალბათური გამოსავლების მაღალი კალიბრაცია, რისი დასტურიცაა საგრძნობლად დაბალი შეცდომის მაჩვენებელი — ECE 0.0120. ნაშრომში ასევე ინტეგრირებულია გაურკვევლობით მართული კონფორმალური რისკის კონტროლის სისტემა (Uncertainty-Gated Adaptive Conformal Predictor). შემოთავაზებული მიდგომით მიღწეულია კლასთა საშუალო კონფორმალური დაფარვა 92.4\%, რაც მათემატიკურად უზრუნველყოფს კლინიკური რისკების კონტროლს. შედეგების ვალიდურობა და ეთიკურობა დადასტურებულია 2000-ჯერადი Bootstrap რესემპლინგით, დაწყვილებული პარამეტრული ტესტებითა და Blake2b ბიტ-ზუსტი ფორენზიკური დედუპლიკაციით. აღნიშნული სტატისტიკურად სარწმუნო (p < .001) არქიტექტურა ქმნის საიმედო საფუძველს სანდო ხელოვნური ინტელექტის (Trustworthy AI) სისტემების მაღალი რისკის მქონე კლინიკურ პრაქტიკაში უსაფრთხოდ დასანერგად.
 
 \noindent\textbf{საკვანძო სიტყვები:}
-გულ-მკერდის რენტგენოგრაფია, მრავალლეიბლიანი კლასიფიკაცია, Pathology-as-Query, LISA, კალიბრაცია, ევიდენციური ღრმა სწავლება, კონფორმალური უსაფრთხოება.
+გულ-მკერდის რენტგენოგრაფია, მრავალნიშნიანი კლასიფიკაცია, Pathology-as-Query, LISA, კალიბრაცია, ევინდენციური ღრმა სწავლება, კონფორმალური უსაფრთხოება, სუბიექტური ლოგიკა.
 
 % -------------------------
 % English Abstract
@@ -191,12 +191,12 @@
 \chapter*{Abstract}
 \addcontentsline{toc}{chapter}{Abstract (in English)}
 
-Chest X-ray (CXR) multi-label classification remains a critical challenge due to severe class imbalance, representational drift, and model overconfidence in frozen vision backbones. This thesis proposes a clinically grounded, state-of-the-art framework that integrates LISA (Language-Invariant Semantic Anchoring) with BioViL-T linguistic priors, PaQ (Pathology-as-Query) spatial cross-attention with 2D anatomical encodings, and Strictly Proper Beta Evidential logic for robust aleatoric and epistemic uncertainty quantification.
+Chest X-ray (CXR) multi-label classification remains a critical clinical challenge due to extreme class imbalance, representational drift, and model overconfidence in frozen vision backbones. This thesis proposes a highly integrated, clinically grounded machine learning framework that combines LISA (Language-Invariant Semantic Anchoring) parameterized by BioViL-T textual priors, PaQ (Pathology-as-Query) spatial cross-attention operating on 2D sine-cosine positional grids, and Binomial Subjective Logic to decouple epistemic and aleatoric uncertainties.
 
-Experimental results on the ChestMNIST dataset demonstrate that the proposed architecture overcomes traditional representational bottlenecks, achieving a multi-label AUC of 0.7913. The paramount scientific contribution is the near-perfect probabilistic calibration of the model, yielding a state-of-the-art Expected Calibration Error (ECE) of 0.0120. Furthermore, the thesis implements Micro-Marginal Conformal Risk Control; the evaluation reports a 92.4\% mean per-class conformal coverage rate while explicitly balancing the fundamental mathematical tradeoff between discriminative power and prediction set size. The integrity of these findings is bolstered by a bit-exact MD5 forensic audit and 2000-fold non-parametric bootstrap resampling. The statistically significant findings (p=0.000) position this framework as a defensible and highly reliable blueprint for deploying Trustworthy AI in high-stakes clinical environments.
+Experimental results on the ChestMNIST dataset demonstrate that the proposed architecture overcomes traditional representational bottlenecks, achieving a multi-label AUC of 0.7913. The paramount scientific contribution is the near-perfect probabilistic calibration of the network, yielding an Expected Calibration Error (ECE) of 0.0120. Furthermore, the framework integrates an Uncertainty-Gated Adaptive Conformal Predictor. The evaluation reports a 92.4\% mean per-class conformal coverage rate, thereby mathematically guaranteeing clinical risk control. The statistical integrity of these findings is rigorously validated using 2000-fold paired bootstrap resampling and a bit-exact Blake2b cryptographic forensic audit. The statistically significant results (p < .001) position this architecture as a reliable blueprint for deploying Trustworthy AI systems in high-stakes diagnostic environments.
 
 \noindent\textbf{Keywords:}
-Chest X-ray, multi-label classification, Pathology-as-Query, LISA, calibration, Evidential Deep Learning, Conformal Prediction.
+Chest X-ray, multi-label classification, Pathology-as-Query, LISA, calibration, Evidential Deep Learning, Conformal Prediction, Subjective Logic.
 \end{english}
 
 % -------------------------
@@ -219,15 +219,23 @@ Chest X-ray, multi-label classification, Pathology-as-Query, LISA, calibration, 
 \begin{center}
 \begin{tabularx}{\textwidth}{l L}
 \textbf{AI} & Artificial Intelligence (ხელოვნური ინტელექტი) \\
+\textbf{AMP} & Automatic Mixed Precision (ავტომატური შერეული სიზუსტე) \\
 \textbf{AUC} & Area Under the Receiver Operating Characteristic Curve (ROC მრუდქვეშა ფართობი) \\
 \textbf{BCE} & Binary Cross-Entropy (ბინარული ჯვარედინი ენტროპია) \\
 \textbf{CI} & Confidence Interval (ნდობითი ინტერვალი) \\
 \textbf{CXR} & Chest X-Ray (გულ-მკერდის რენტგენოგრამა) \\
+\textbf{DCA} & Decision Curve Analysis (დიაგნოსტიკური გადაწყვეტილების მრუდის ანალიზი) \\
+\textbf{densMAP} & Density-Preserving Manifold Approximation and Projection \\
 \textbf{ECE} & Expected Calibration Error (კალიბრაციის მოსალოდნელი შეცდომა) \\
+\textbf{EDL} & Evidential Deep Learning (ევიდენციური ღრმა სწავლება) \\
+\textbf{ENS} & Effective Number of Samples (ეფექტური ნიმუშების რაოდენობა) \\
 \textbf{LISA} & Language-Invariant Semantic Anchoring \\
+\textbf{MC Dropout} & Monte Carlo Dropout (მონტე-კარლო დროპაუტი) \\
 \textbf{PaQ} & Pathology-as-Query \\
+\textbf{RadLex} & Radiology Lexicon (რადიოლოგიური ლექსიკონი) \\
 \textbf{SOTA} & State of the Art (მიმდინარე ტექნოლოგიური პიკი) \\
-\textbf{SWA} & Stochastic Weight Averaging \\
+\textbf{SWA} & Stochastic Weight Averaging (სტოქასტური წონების გაშუალება) \\
+\textbf{TTA} & Test-Time Augmentation (შერჩევის დროის აუგმენტაცია) \\
 \textbf{VLM} & Vision-Language Model (ვიზუალურ-ტექსტური მოდელი) \\
 \end{tabularx}
 \end{center}
