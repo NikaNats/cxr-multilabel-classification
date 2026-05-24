@@ -16,7 +16,7 @@ from tqdm.auto import tqdm
 
 from config import log_process, DEVICE
 from evaluators import validate
-from model import CXR_Synapse_Foundation, PriorAwareAsymmetricFocalLoss
+from model import CXR_Synapse_Foundation, AsymmetricLoss
 from utils import ensure_radlex_embeddings, RADLEX_PATHOLOGIES, EarlyStopping
 
 CFG: dict[str, Any] = {
@@ -63,8 +63,11 @@ def train_single_model(
     priors = np.clip(priors, 1e-4, 1.0 - 1e-4)
     model.set_priors(priors)
 
-    loss_fn = PriorAwareAsymmetricFocalLoss(
-        priors=priors, annealing_epochs=20, gamma_neg=2.0
+    # Instantiate SOTA Asymmetric Loss
+    loss_fn = AsymmetricLoss(
+        gamma_neg=4.0, 
+        gamma_pos=1.0, 
+        clip=0.05
     ).to(DEVICE)
 
     decay_params = []
@@ -123,7 +126,8 @@ def train_single_model(
 
             with torch.amp.autocast("cuda", enabled=(DEVICE.type == "cuda")):
                 z_v = model(feats)
-                evidential_loss = loss_fn(z_v, lbls, epoch)
+                # Apply asymmetric optimization
+                classification_loss = loss_fn(z_v, lbls, epoch)
 
                 current_queries = model.pathology_router.text_proj(model.radlex_emb)
                 norm_queries = F.normalize(current_queries, p=2, dim=-1)
@@ -133,7 +137,8 @@ def train_single_model(
                 q_current = F.log_softmax(current_topology / 0.1, dim=-1)
                 anchor_loss = F.kl_div(q_current, p_target, reduction="batchmean")
 
-                loss = evidential_loss + (0.5 * anchor_loss)
+                # Balanced multiobjective optimization
+                loss = classification_loss + (0.5 * anchor_loss)
 
             if not torch.isfinite(loss):
                 continue
@@ -152,8 +157,8 @@ def train_single_model(
             pbar.set_postfix(
                 {
                     "total": f"{loss.item():.3f}",
-                    "focal_edl": f"{evidential_loss.item():.3f}",
-                    "lisa": f"{anchor_loss.item():.3f}",
+                    "asl_loss": f"{classification_loss.item():.3f}",
+                    "anchor_loss": f"{anchor_loss.item():.3f}",
                 }
             )
 

@@ -36,34 +36,32 @@ def get_2d_sincos_pos_embed(
 
 
 # ==============================================================================
-# § 2  PRIOR-AWARE EVIDENTIAL METRICS
+# § 2  CALIBRATED MULTI-LABEL PROBABILITIES & SHANNON ENTROPY (REPLACED EDL)
 # ==============================================================================
 
 def get_evidential_metrics(
     z_v: torch.Tensor, priors: torch.Tensor | np.ndarray | None = None, W: float = 2.0
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """
-    Computes prior-aware probabilities, epistemic uncertainty, and aleatoric 
-    uncertainty from unshifted logits using Binomial Subjective Logic.
+    Replaces Binomial Subjective Logic with standard sigmoid-based probabilities
+    and normalized predictive Shannon entropy. Preserves the function signature 
+    to prevent breaking existing validation downstream dependencies.
+    
+    Returns:
+        prob: Sigmoid probabilities.
+        epistemic: Shannon entropy per class scaled to [0, 1] as a proxy for uncertainty.
+        aleatoric: Statistical binomial variance p * (1 - p).
     """
-    z_safe = torch.clamp(z_v, min=-10.0, max=10.0)
-    alpha = torch.exp(z_safe) + 1.0
-    beta = torch.exp(-z_safe) + 1.0
-    s_param = alpha + beta
+    prob = torch.sigmoid(z_v)
+    eps = 1e-8
     
-    r = alpha - 1.0
-    
-    if priors is not None:
-        if isinstance(priors, torch.Tensor):
-            priors_t = priors.to(device=z_v.device, dtype=z_v.dtype)
-        else:
-            priors_t = torch.as_tensor(priors, device=z_v.device, dtype=z_v.dtype)
-        prob = (r + W * priors_t) / s_param
-    else:
-        prob = torch.sigmoid(z_v)
-        
-    epistemic = W / s_param
+    # Aleatoric Uncertainty: Binomial variance of predictions
     aleatoric = prob * (1.0 - prob)
+    
+    # Epistemic Uncertainty: Shannon entropy per class rescaled to [0, 1] range using base-2 logarithm
+    entropy = - (prob * torch.log2(prob + eps) + (1.0 - prob) * torch.log2(1.0 - prob + eps))
+    epistemic = entropy.clamp(min=0.0, max=1.0)
+    
     return prob, epistemic, aleatoric
 
 
@@ -193,72 +191,54 @@ class CXR_Synapse_Foundation(nn.Module):
 
 
 # ==============================================================================
-# § 5  PRIOR-AWARE ASYMMETRIC FOCAL EVIDENTIAL LOSS
+# § 5  ASYMMETRIC LOSS (ASL) FOR RIGOROUS IMBALANCE CONTROL
 # ==============================================================================
 
-class PriorAwareAsymmetricFocalLoss(nn.Module):
+class AsymmetricLoss(nn.Module):
     """
-    Computes prior-aware evidential classification losses using Dirichlet 
-    parameter regularization and asymmetric focal scaling.
+    Asymmetric Loss (ASL) for Multi-Label Classification.
+    Decouples positive and negative focusing parameter dynamics to preserve
+    stable clinical gradient flow on highly skewed medical distributions.
     """
     def __init__(
         self,
-        priors: torch.Tensor | np.ndarray,
-        annealing_epochs: int = 20,
-        gamma_neg: float = 2.0,
+        gamma_neg: float = 4.0,
         gamma_pos: float = 1.0,
-        W: float = 2.0,
+        clip: float = 0.05,
+        eps: float = 1e-8,
     ):
         super().__init__()
-        self.annealing_epochs = max(int(annealing_epochs), 1)
         self.gamma_neg = gamma_neg
         self.gamma_pos = gamma_pos
-        self.W = W
-        self.register_buffer("priors", torch.as_tensor(priors, dtype=torch.float32))
+        self.clip = clip
+        self.eps = eps
 
-    def beta_kl_divergence(self, alpha: torch.Tensor, beta: torch.Tensor) -> torch.Tensor:
-        """Calculates the symmetric Kullback-Leibler divergence between two Beta distributions."""
-        gamma_ab = torch.lgamma(alpha + beta)
-        gamma_a = torch.lgamma(alpha)
-        gamma_b = torch.lgamma(beta)
-        digamma_ab = torch.digamma(alpha + beta)
-        return (
-            (gamma_ab - gamma_a - gamma_b)
-            + (alpha - 1.0) * (torch.digamma(alpha) - digamma_ab)
-            + (beta - 1.0) * (torch.digamma(beta) - digamma_ab)
-        )
+    def forward(self, x: torch.Tensor, y: torch.Tensor, epoch: int | None = None) -> torch.Tensor:
+        """
+        Calculates loss over target-decoupled sigmoid outputs.
+        Accepts the 'epoch' argument optionally to preserve API compatibility.
+        """
+        # 1. Compute baseline sigmoid probabilities
+        xs_pos = torch.sigmoid(x)
+        xs_neg = 1.0 - xs_pos
 
-    def forward(self, z_v: torch.Tensor, targets: torch.Tensor, current_epoch: int) -> torch.Tensor:
-        # 1. Compute prior-aware calibrated probabilities
-        z_safe = torch.clamp(z_v, min=-10.0, max=10.0)
-        alpha = torch.exp(z_safe) + 1.0
-        beta = torch.exp(-z_safe) + 1.0
-        s_param = alpha + beta
-        r = alpha - 1.0
-        
-        probs = (r + self.W * self.priors) / s_param
-        probs_clamped = torch.clamp(probs, 1e-7, 1.0 - 1e-7)
+        # 2. Asymmetric shifting/clipping margin for easy negative classes
+        if self.clip is not None and self.clip > 0:
+            xs_neg = (xs_neg + self.clip).clamp(max=1.0)
 
-        # 2. Asymmetric Focal Objective on prior-aware probabilities
-        focal_weight = (
-            targets * ((1.0 - probs_clamped) ** self.gamma_pos)
-            + (1.0 - targets) * (probs_clamped ** self.gamma_neg)
-        )
+        # 3. Standard Bilateral Cross Entropy components
+        loss_pos = y * torch.log(xs_pos.clamp(min=self.eps))
+        loss_neg = (1.0 - y) * torch.log(xs_neg.clamp(min=self.eps))
+        loss = loss_pos + loss_neg
 
-        bce_loss = -(targets * torch.log(probs_clamped) + (1.0 - targets) * torch.log(1.0 - probs_clamped))
-        clf_loss = torch.mean(focal_weight * bce_loss)
+        # 4. Target-decoupled asymmetric focal focusing scale
+        if self.gamma_pos > 0 or self.gamma_neg > 0:
+            if self.gamma_pos > 0:
+                factors_pos = (1.0 - xs_pos) ** self.gamma_pos
+                loss_pos *= factors_pos
+            if self.gamma_neg > 0:
+                factors_neg = (1.0 - xs_neg) ** self.gamma_neg
+                loss_neg *= factors_neg
+            loss = loss_pos + loss_neg
 
-        # 3. KL Evidential annealing on unshifted Dirichlet parameters
-        # Numerical Safety Fix: Add a tiny epsilon (1e-8) to ensure smooth gradients under FP16
-        alpha_tilde = targets + (1.0 - targets) * alpha + 1e-8
-        beta_tilde = (1.0 - targets) + targets * beta + 1e-8
-        kl_raw = self.beta_kl_divergence(alpha_tilde, beta_tilde)
-
-        class_anneal_factor = torch.clamp(1.0 / (self.priors + 1e-5), min=1.0, max=10.0)
-        anneal_coef = torch.clamp(
-            float(current_epoch) / (float(self.annealing_epochs) * class_anneal_factor), 
-            max=1.0
-        )
-        kl_loss = torch.mean(anneal_coef * kl_raw)
-
-        return clf_loss + (0.05 * kl_loss)
+        return -loss.mean()
