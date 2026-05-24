@@ -314,10 +314,11 @@ def main() -> None:
         "stats", "Statistical Validation & Assumptions", "\n".join(stat_report)
     )
 
-    # 5. Calibrate the Gated Conformal Predictor using CALIBRATED val_probs and calibrated base thresholds
+    # 5. Calibrate the Gated Conformal Predictor with Class-Specific Alphas
     conformal_predictor = UncertaintyGatedAdaptiveConformalPredictor(
-        alpha=0.10, rejection_quantile=0.10
+        rejection_quantile=0.10
     )
+    # Global 'alpha' argument is no longer passed to prioritize internal risk-limiting class-wise alphas vector
     conformal_predictor.calibrate(
         val_probs, val_labels, cal_opt_thresholds, val_class_aucs, val_uncertainties
     )
