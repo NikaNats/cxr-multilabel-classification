@@ -1,8 +1,10 @@
+# -*- coding: utf-8 -*-
 from __future__ import annotations
 
+import os
 import gc
+import random
 import warnings
-
 import numpy as np
 import pandas as pd
 import torch
@@ -22,29 +24,29 @@ from config import (
     log_clinical_report,
     log_process,
 )
-from data import get_dataloaders
-from evaluators import DeepEnsembleTTAEvaluator, validate
+from data import get_raw_datasets, get_dataloaders
+from audit import execute_forensic_audit
 from model import CXR_Synapse_Foundation
 from train import train_ensemble
+from evaluators import DeepEnsembleTTAEvaluator, validate
 from utils import (
     CHESTMNIST_CLASS_NAMES,
     RADLEX_PATHOLOGIES,
-    UncertaintyGatedAdaptiveConformalPredictor,
-    ClassWiseAsymmetricIsotonicCalibrator,
-    bootstrap_metric_ci,
+    select_adjacency_threshold,
     build_hybrid_clinical_adjacency,
+    optimise_thresholds,
+    ClassWiseAsymmetricIsotonicCalibrator,
+    UncertaintyGatedAdaptiveConformalPredictor,
     ensure_radlex_embeddings,
     expected_calibration_error,
     format_apa_correlation,
     format_apa_p_value,
-    optimise_thresholds,
+    bootstrap_metric_ci,
     paired_bootstrap_metric_test,
-    select_adjacency_threshold,
 )
 from visualizer import (
-    configure_nature_style,
-    plot_conformal_tradeoff,
     plot_diagnostic_suite,
+    plot_conformal_tradeoff,
     plot_semantic_manifold,
 )
 
@@ -132,17 +134,29 @@ def run_forensic_visual_audit(
     )
 
 
+def set_seed(seed: int = 42) -> None:
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
+
 def main() -> None:
-    """Executes the complete end-to-end training and evaluation pipeline."""
-    configure_nature_style()
+    """Executes the complete end-to-end training, statistical validation, and conformal evaluation pipeline."""
+    set_seed(42)
+    os.makedirs(FIGURE_DIR, exist_ok=True)
 
     log_process("main", "pipeline_started", name=EXPERIMENT_NAME, run_id=EXPERIMENT_ID)
 
-    # PHASE 1 — DATA PREPARATION
+    # PHASE 1 — DATA PREPARATION & AUDITING
+    # train_raw, val_raw, test_raw, class_names = get_raw_datasets()
+    # execute_forensic_audit(train_raw, val_raw, test_raw, chunk_size=2000)
+
     train_emb_dataset, train_loader, val_loader, _, num_workers = get_dataloaders()
     train_labels_np = train_emb_dataset.labels.numpy().astype(np.float32)
     priors = np.mean(train_labels_np, axis=0)
-    priors = np.clip(priors, 1e-4, 1.0 - 1e-4)
+    priors_clipped = np.clip(priors, 1e-4, 1.0 - 1e-4)
 
     adj_threshold = select_adjacency_threshold(train_labels_np, num_classes=14)
     
@@ -173,7 +187,7 @@ def main() -> None:
     pro_model = CXR_Synapse_Foundation(num_classes=14).to(DEVICE)
     pro_model.set_adjacency_mask(adj_norm)
     pro_model.set_radlex_embeddings(radlex_embeddings)
-    pro_model.set_priors(priors)
+    pro_model.set_priors(priors_clipped)
 
     raw_state = torch.load(
         ensemble_checkpoints[-1], map_location=DEVICE, weights_only=True
@@ -194,7 +208,7 @@ def main() -> None:
         device_=DEVICE,
         adj_norm_np=adj_norm,
         num_mc_passes=10,
-        priors=priors,
+        priors=priors_clipped,
     )
     val_ensemble_results = val_ensemble_evaluator.evaluate(
         eval_val_loader, thresholds=None
@@ -206,7 +220,7 @@ def main() -> None:
     
     # Extract baseline validation class-specific performance for conformal weighting
     _, _, _, _, _, val_class_aucs = validate(
-        pro_model, eval_val_loader, DEVICE, priors=priors
+        pro_model, eval_val_loader, DEVICE, priors=priors_clipped
     )
     
     # --------------------------------------------------------------------------
@@ -243,7 +257,7 @@ def main() -> None:
 
     # 3. Calibrated single-model baseline test evaluation
     _, _, _, raw_base_preds, base_labels, _ = validate(
-        pro_model, eval_test_loader, DEVICE, priors=priors
+        pro_model, eval_test_loader, DEVICE, priors=priors_clipped
     )
     # Apply Isotonic Calibration to single-model baseline
     base_preds = air_calibrator.calibrate(raw_base_preds)
@@ -256,7 +270,7 @@ def main() -> None:
         device_=DEVICE,
         adj_norm_np=adj_norm,
         num_mc_passes=10,
-        priors=priors,
+        priors=priors_clipped,
     ).evaluate(eval_test_loader, thresholds=opt_thresholds)
 
     raw_test_preds = raw_ensemble_results["predictive_mean"]
@@ -318,7 +332,7 @@ def main() -> None:
     conformal_predictor = UncertaintyGatedAdaptiveConformalPredictor(
         rejection_quantile=0.10
     )
-    # Global 'alpha' argument is no longer passed to prioritize internal risk-limiting class-wise alphas vector
+    
     conformal_predictor.calibrate(
         val_probs, val_labels, cal_opt_thresholds, val_class_aucs, val_uncertainties
     )

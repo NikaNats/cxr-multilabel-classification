@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 import gc
@@ -11,6 +12,9 @@ import pandas as pd
 import seaborn as sns
 import torch
 import torch.nn.functional as F
+
+import cupy as cp
+import cucim.skimage.filters as cur_filters
 from scipy.stats import chi2_contingency, entropy, ks_2samp, mannwhitneyu
 from sklearn.metrics import matthews_corrcoef, mutual_info_score
 
@@ -75,7 +79,6 @@ _NATURE_RCPARAMS = {
 }
 
 def configure_nature_style() -> None:
-    """Configures global matplotlib properties to enforce Nature styles."""
     plt.rcParams.update(_NATURE_RCPARAMS)
     sns.set_theme(style="white", palette=COLOUR_CYCLE, rc=_NATURE_RCPARAMS)
 
@@ -131,7 +134,6 @@ class ForensicDatasetAuditor:
     def _chunked_image_generator(
         self, indices: np.ndarray | list[int] | None = None
     ) -> Generator[torch.Tensor, None, None]:
-        """Memory-safe generator that yields image chunks as PyTorch tensors."""
         target_indices = np.arange(self.n_samples) if indices is None else np.array(indices)
         for i in range(0, len(target_indices), self.chunk_size):
             batch_idx = target_indices[i : i + self.chunk_size]
@@ -146,7 +148,6 @@ class ForensicDatasetAuditor:
 
         with torch.no_grad():
             for chunk in self._chunked_image_generator():
-                # Compute accelerated metrics per chunk
                 mean = torch.mean(chunk, dim=(1, 2))
                 std = torch.std(chunk, dim=(1, 2))
                 img_means_list.append(mean.cpu().numpy())
@@ -184,8 +185,8 @@ class ForensicDatasetAuditor:
         gc.collect()
 
     def audit_spatial_morphology(self) -> None:
-        """Accelerated Spatial Morphology using GPU PyTorch operations."""
-        print("[*] Auditing Spatial Morphology (PyTorch Accelerated)...")
+        """Accelerated Spatial Morphology using GPU PyTorch and cuCIM filters."""
+        print("[*] Auditing Spatial Morphology (PyTorch & cuCIM Accelerated)...")
         sum_img = torch.zeros((self.h, self.w), dtype=torch.float64, device=self.device)
         sum_sq_img = torch.zeros((self.h, self.w), dtype=torch.float64, device=self.device)
 
@@ -198,7 +199,6 @@ class ForensicDatasetAuditor:
         global_var = (sum_sq_img / self.n_samples) - (torch.tensor(global_mean, device=self.device) ** 2)
         std_heatmap = torch.sqrt(torch.clamp(global_var, min=0.0)).cpu().numpy().astype(np.float32)
 
-        # Differential pathology heatmaps
         diff_maps = {}
         for c, name in enumerate(self.class_names):
             class_indices = np.where(self.labels[:, c] == 1)[0]
@@ -214,19 +214,16 @@ class ForensicDatasetAuditor:
         rng = np.random.RandomState(42)
         sample_idx = rng.choice(self.n_samples, min(1000, self.n_samples), replace=False)
         
-        edge_density_accum = torch.zeros((self.h, self.w), dtype=torch.float32, device=self.device)
-        sobel_x = torch.tensor([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], dtype=torch.float32, device=self.device).view(1, 1, 3, 3)
-        sobel_y = torch.tensor([[-1, -2, -1], [0, 0, 0], [1, 2, 1]], dtype=torch.float32, device=self.device).view(1, 1, 3, 3)
+        # cuCIM-Accelerated Edge Density computation on the GPU
+        edge_density_accum = cp.zeros((self.h, self.w), dtype=cp.float32)
+        
+        for chunk in self._chunked_image_generator(indices=sample_idx):
+            # Wrap PyTorch CUDA tensor as a zero-copy CuPy array
+            chunk_cupy = cp.asnumpy(chunk.cpu().numpy()) if self.device.type == "cpu" else cp.asarray(chunk)
+            for i in range(chunk_cupy.shape[0]):
+                edge_density_accum += cur_filters.sobel(chunk_cupy[i])
 
-        with torch.no_grad():
-            for chunk in self._chunked_image_generator(indices=sample_idx):
-                chunk_unsqueezed = chunk.unsqueeze(1) # (B, 1, H, W)
-                edges_x = F.conv2d(chunk_unsqueezed, sobel_x, padding=1)
-                edges_y = F.conv2d(chunk_unsqueezed, sobel_y, padding=1)
-                magnitude = torch.sqrt(edges_x**2 + edges_y**2)
-                edge_density_accum += torch.sum(magnitude, dim=0).squeeze(0)
-
-        edge_density = (edge_density_accum / len(sample_idx)).cpu().numpy()
+        edge_density = cp.asnumpy(edge_density_accum / len(sample_idx))
 
         self.results.update({
             'global_mean': global_mean, 'std_heatmap': std_heatmap, 'diff_maps': diff_maps,
@@ -235,7 +232,6 @@ class ForensicDatasetAuditor:
         gc.collect()
 
     def audit_clinical_logic(self) -> None:
-        """Computes clinical logic matrix (Phi Coeff, Cramer's V) using vectorized matrix operations."""
         print("[*] Auditing Clinical Logic...")
         n = self.n_classes
         phi_matrix = np.zeros((n, n))
@@ -266,7 +262,6 @@ class ForensicDatasetAuditor:
         })
 
     def audit_safety_integrity(self) -> None:
-        """Analyzes dataset safety, SNR distribution, and bit-exact duplicates with memory safety."""
         print("[*] Auditing Safety & Integrity...")
         image_entropies = np.zeros(self.n_samples)
         
@@ -302,7 +297,6 @@ class ForensicDatasetAuditor:
 
     @staticmethod
     def compute_image_hashes(dataset: Any, digest_size: int = 16) -> set[str]:
-        """Calculates BLAKE2b hashes over the raw dataset inputs."""
         imgs = dataset.imgs
         hashes = set()
         for i in range(len(imgs)):
@@ -311,7 +305,6 @@ class ForensicDatasetAuditor:
         return hashes
 
     def audit_cross_split_leakage(self, other_datasets: dict[str, Any]) -> dict[str, int]:
-        """Scans separate dataset splits to identify and report shared patient sample duplicates."""
         print(f"\n[*] Cross-Split Image Leakage Audit ({self.split_name} vs others)...")
         self_hashes = self.compute_image_hashes(self.dataset)
         leakage_report = {}
@@ -333,7 +326,6 @@ class ForensicDatasetAuditor:
         return leakage_report
 
     def audit_localized_structure(self, grid_size: int = 2) -> dict[str, Any]:
-        """Localized spatial information map with accelerated grid-slicing."""
         print(f"\n[*] Localized Spatial Audit ({grid_size}x{grid_size} grid)...")
         ph, pw = self.h // grid_size, self.w // grid_size
         quadrant_info = {}
@@ -368,7 +360,6 @@ class ForensicDatasetAuditor:
         return quadrant_info
 
     def audit_clinical_consistency(self) -> tuple[int, list[str]]:
-        """Performs logical consistency check against clinical rule engine."""
         print("[*] Clinical Consistency Audit...")
         violations = 0
         violation_details = []
@@ -397,7 +388,6 @@ class ForensicDatasetAuditor:
         return violations, violation_details
 
     def audit_effective_samples(self, beta: float = 0.9999) -> pd.DataFrame:
-        """Calculates Class-Balanced Effective Number of Samples (ENS) to audit gradient starvation."""
         ens_data = []
         for c in range(self.n_classes):
             n_c = int(self.labels[:, c].sum())
@@ -409,7 +399,6 @@ class ForensicDatasetAuditor:
         return ens_df
 
     def audit_entropy_gap(self) -> dict[str, float]:
-        """Quantifies the information-theoretic entropy gap between pathological and normal subgroups."""
         if 'img_entropy' not in self.results:
             self.audit_safety_integrity()
         ent = self.results['img_entropy']
@@ -430,7 +419,6 @@ class ForensicDatasetAuditor:
         return self.results['entropy_gap']
 
     def generate_report(self) -> None:
-        """Assembles scientific diagnostic dashboard adhering to strict Nature specifications."""
         configure_nature_style()
         print(f"\n{'=' * 65}\n  FORENSIC DATASET AUDIT — {self.split_name} Split\n  n = {self.n_samples:,} | {self.n_classes} classes | {self.h}x{self.w} px\n{'=' * 65}")
 
@@ -456,7 +444,7 @@ class ForensicDatasetAuditor:
         print(f"\n  Clinical Logic: {cv} high-cardinality, {ip} implausible co-occurrence(s)")
 
         try:
-            fig = plt.figure(figsize=(DOUBLE_COL_IN * 1.5, MAX_HEIGHT_IN * 1.1))
+            fig = plt.figure(figsize=(DOUBLE_COL_IN * 1.5, MAX_HEIGHT_IN * 1.1), layout="constrained")
             mosaic = """
             AAABB
             AAACC
@@ -466,7 +454,7 @@ class ForensicDatasetAuditor:
             KKKKK
             LLLLL
             """
-            ax = fig.subplot_mosaic(mosaic, layout="constrained")
+            ax = fig.subplot_mosaic(mosaic)
             short_names = [n[:12] for n in self.class_names]
 
             # A. Conditional Prevalence
@@ -474,7 +462,7 @@ class ForensicDatasetAuditor:
                         xticklabels=short_names, yticklabels=short_names, linewidths=0.3, linecolor='white', cbar=False)
             ax['A'].set_title("a. Conditional Prevalence P(Row | Col)")
 
-            # B. Pixel-Wise Variance Map (Memory Safe)
+            # B. Pixel-Wise Variance Map
             im_b = ax['B'].imshow(self.results['std_heatmap'], cmap='magma', aspect='equal')
             ax['B'].set_title("b. Pixel-Wise Variance")
             ax['B'].axis('off')
@@ -510,11 +498,10 @@ class ForensicDatasetAuditor:
             ax['G'].set_title("g. Spatial Edge Density")
             ax['G'].axis('off')
 
-            # H. Class Intensity Profiles (FDR Stable)
+            # H. Class Intensity Profiles
             for i in range(min(5, self.n_classes)):
                 mask_c = self.labels[:, i] == 1
                 if mask_c.sum() > 0:
-                    # Memory safe class extraction
                     sampled_intensities = []
                     for chunk in self._chunked_image_generator(indices=np.where(mask_c)[0]):
                         sampled_intensities.append(chunk.cpu().numpy().flatten())
@@ -556,7 +543,6 @@ class ForensicDatasetAuditor:
             ax['L'].text(0.5, 0.5, summary_lines, ha='center', va='center', fontsize=6, family='monospace',
                          transform=ax['L'].transAxes)
 
-            # Export as highest quality vector PDF & raster PNG
             out_pdf = f"forensic_audit_{self.split_name.lower()}.pdf"
             out_png = f"forensic_audit_{self.split_name.lower()}.png"
             fig.savefig(out_pdf, format="pdf", dpi=FIGURE_DPI, bbox_inches="tight")
@@ -577,7 +563,6 @@ class ForensicDatasetAuditor:
 # AUDIT EXECUTION WRAPPER
 # ============================================================
 def execute_forensic_audit(train_dataset: Any, val_dataset: Any, test_dataset: Any, chunk_size: int = 2000) -> None:
-    """Executes a sequentially isolated forensic verification pass over all datasets."""
     print("\n" + "=" * 65)
     print("  EXECUTING FORENSIC DATASET AUDIT")
     print("=" * 65)

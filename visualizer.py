@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gc
 import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -18,8 +19,15 @@ from sklearn.metrics import (
     roc_curve,
 )
 from sklearn.preprocessing import StandardScaler
-import umap
-from umap.utils import disconnected_vertices
+
+# GPU-Accelerated UMAP check (cuml) with graceful CPU fallback
+try:
+    from cuml.manifold import UMAP as GPU_UMAP
+    _HAS_CUML = True
+except ImportError:
+    import umap
+    from umap.utils import disconnected_vertices
+    _HAS_CUML = False
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -47,7 +55,7 @@ COLOUR_CYCLE: list[str] = [
 _MM_TO_IN     = 1.0 / 25.4
 SINGLE_COL_IN = 89  * _MM_TO_IN   # 89 mm single-column width
 DOUBLE_COL_IN = 183 * _MM_TO_IN   # 183 mm double-column width
-MAX_HEIGHT_IN = 230 * _MM_TO_IN   # 170 mm max height
+MAX_HEIGHT_IN = 230 * _MM_TO_IN   # 230 mm max height
 FIGURE_DPI    = 450               # Min 300, 450 for highest resolution
 
 _NATURE_RCPARAMS: dict = {
@@ -283,7 +291,7 @@ def _draw_uncertainty_vs_set_size(ax: plt.Axes, data: _DiagnosticData) -> None:
         }
     )
     
-    ax.set_xlabel("Epistemic uncertainty (variance)")
+    ax.set_xlabel("Epistemic uncertainty (entropy)")
     ax.set_ylabel("Conformal set size (count)")
     ax.set_title("Uncertainty vs. set size")
     
@@ -387,12 +395,12 @@ def _draw_uncertainty_by_error(ax: plt.Axes, data: _DiagnosticData) -> None:
         clip=(0, None), label="High error"
     )
     
-    ax.set_xlabel("Epistemic uncertainty (variance)")
+    ax.set_xlabel("Epistemic uncertainty (entropy)")
     ax.set_ylabel("Density (proportion)")
     ax.set_title("Uncertainty by error profile")
     
     u_min, u_max = data.uncertainty.min(), data.uncertainty.max()
-    ax.set_xlim(u_min * 0.95, min(0.5, u_max * 1.05))
+    ax.set_xlim(u_min * 0.95, min(1.05, u_max * 1.05))
 
     ax.tick_params(
         axis='both', 
@@ -452,7 +460,7 @@ def _draw_macro_pr(ax: plt.Axes, data: _DiagnosticData) -> None:
     
     ax.set_xlabel("Recall (proportion)")
     ax.set_ylabel("Precision (proportion)")
-    ax.set_title("Macro precision–recall")
+    ax.set_title("Macro precision-recall")
     
     ax.tick_params(
         axis='both', 
@@ -525,7 +533,7 @@ def _draw_abstention_curve(ax: plt.Axes, data: _DiagnosticData) -> None:
     
     ax.set_xlabel("Samples rejected (%)")
     ax.set_ylabel("Retained macro-AUROC (score)") 
-    ax.set_title("Accuracy–rejection curve")
+    ax.set_title("Accuracy-rejection curve")
     
     ax.tick_params(
         axis='both', which='major', labelsize=5, 
@@ -574,19 +582,27 @@ def _draw_decision_curve(ax: plt.Axes, data: _DiagnosticData) -> None:
 
 def _draw_uncertainty_by_class(ax: plt.Axes, data: _DiagnosticData) -> None:
     """Plots epistemic uncertainty partitioned by medical pathologies."""
-    rows = []
-    for i, name in enumerate(data.class_names):
-        vals = data.uncertainty[data.labels[:, i] == 1]
-        n_samples = len(vals)
-        display_name = f"{_shorten_name(name)} (n={n_samples})"
-        for v in vals:
-            rows.append({"Pathology": display_name, "Uncertainty": v})
+    # OPTIMIZATION: Vectorized DataFrame generation avoids slow nested Python loops
+    uncertainty_list = []
+    pathology_list = []
     
-    if not rows:
+    for i, name in enumerate(data.class_names):
+        mask = data.labels[:, i] == 1
+        vals = data.uncertainty[mask]
+        n_samples = len(vals)
+        if n_samples > 0:
+            display_name = f"{_shorten_name(name)} (n={n_samples})"
+            uncertainty_list.append(vals)
+            pathology_list.append(np.full(n_samples, display_name))
+            
+    if not uncertainty_list:
         ax.set_visible(False)
         return
-    
-    df = pd.DataFrame(rows)
+        
+    df = pd.DataFrame({
+        "Uncertainty": np.concatenate(uncertainty_list),
+        "Pathology": np.concatenate(pathology_list)
+    })
     
     sns.stripplot(
         data=df, x="Uncertainty", y="Pathology",
@@ -606,7 +622,7 @@ def _draw_uncertainty_by_class(ax: plt.Axes, data: _DiagnosticData) -> None:
         zorder=2
     )
     
-    ax.set_xlabel("Epistemic uncertainty (variance)")
+    ax.set_xlabel("Epistemic uncertainty (entropy)")
     ax.set_ylabel("")
     ax.set_title("Epistemic profiles (True Positives)")
     
@@ -618,7 +634,7 @@ def _draw_uncertainty_by_class(ax: plt.Axes, data: _DiagnosticData) -> None:
     if u_min == u_max:
         ax.set_xlim(u_min - 0.05, u_min + 0.05)
     else:
-        ax.set_xlim(u_min * 0.95, min(0.5, u_max * 1.05))
+        ax.set_xlim(u_min * 0.95, min(1.05, u_max * 1.05))
     _label_panel(ax, "k")
 
 def _draw_error_correlation(ax: plt.Axes, data: _DiagnosticData) -> None:
@@ -745,7 +761,7 @@ def _draw_entropy_gap(ax: plt.Axes, data: _DiagnosticData) -> None:
         data.uncertainty[has_disease], 
         ax=ax, color=Colour.ORANGE, 
         fill=True, alpha=0.40, linewidth=0.75,
-        clip=(0, None), label="Pathological (≥1)"
+        clip=(0, None), label="Pathological (>=1)"
     )
     sns.kdeplot(
         data.uncertainty[~has_disease], 
@@ -754,16 +770,16 @@ def _draw_entropy_gap(ax: plt.Axes, data: _DiagnosticData) -> None:
         clip=(0, None), label="Healthy (0)"
     )
     
-    ax.set_xlabel("Epistemic uncertainty (variance)")
+    ax.set_xlabel("Epistemic uncertainty (entropy)")
     ax.set_ylabel("Density (proportion)")
     ax.set_title("Epistemic entropy gap")
     
     u_min, u_max = data.uncertainty.min(), data.uncertainty.max()
-    ax.set_xlim(u_min * 0.95, min(0.5, u_max * 1.05)) 
+    ax.set_xlim(u_min * 0.95, min(1.05, u_max * 1.05)) 
     
     ax.legend(
         handles=_legend_patches([
-            ("Pathological (≥1)", Colour.ORANGE),
+            ("Pathological (>=1)", Colour.ORANGE),
             ("Healthy (0)", Colour.GREEN)
         ]),
         loc="upper right",
@@ -869,7 +885,7 @@ def plot_conformal_tradeoff(val_probs: np.ndarray, val_labels: np.ndarray, opt_t
     lines2, labels2 = ax2.get_legend_handles_labels()
     ax1.legend(lines1 + lines2, labels1 + labels2, loc="center right", fontsize=4.5, frameon=False)
 
-    ax1.set_title("Conformal safety–efficiency trade-off", fontsize=7, fontweight="bold")
+    ax1.set_title("Conformal safety-efficiency trade-off", fontsize=7, fontweight="bold")
     
     ax1.spines['top'].set_visible(False)
     ax2.spines['top'].set_visible(False)
@@ -890,25 +906,37 @@ def plot_semantic_manifold(embeddings: np.ndarray, labels: np.ndarray, class_nam
     scaled_emb = StandardScaler().fit_transform(emb)
 
     # Fit SOTA densMAP with Cosine Metric (Reflects UMAP 0.5.x Best Practices)
-    reducer = umap.UMAP(
-        n_neighbors=30,             # recommended larger n_neighbors for densMAP
-        min_dist=0.1,
-        n_components=2,
-        metric='cosine',            # Mathematically rigorous for deep latent features
-        densmap=True,               # Preserves semantic density (Crucial for Nature)
-        dens_lambda=2.0,            # Standard density weight
-        random_state=42,            # For absolute reproducibility
-        n_jobs=-1                   # Allow multithreading control where applicable
-    )
+    if _HAS_CUML:
+        reducer = GPU_UMAP(
+            n_neighbors=30,
+            min_dist=0.1,
+            n_components=2,
+            metric='cosine',
+            random_state=42
+        )
+    else:
+        reducer = umap.UMAP(
+            n_neighbors=30,             # recommended larger n_neighbors for densMAP
+            min_dist=0.1,
+            n_components=2,
+            metric='cosine',            # Mathematically rigorous for deep latent features
+            densmap=True,               # Preserves semantic density (Crucial for Nature)
+            dens_lambda=2.0,            # Standard density weight
+            random_state=42,            # For absolute reproducibility
+            n_jobs=-1                   # Allow multithreading control where applicable
+        )
     
     proj = reducer.fit_transform(scaled_emb)
     
-    disconnected = disconnected_vertices(reducer)
-    valid_mask = ~disconnected
-    
-    proj = proj[valid_mask]
-    has_disease = has_disease[valid_mask]
-    primary_class = primary_class[valid_mask]
+    if not _HAS_CUML:
+        disconnected = disconnected_vertices(reducer)
+        valid_mask = ~disconnected
+        proj = proj[valid_mask]
+        has_disease = has_disease[valid_mask]
+        primary_class = primary_class[valid_mask]
+    else:
+        # GPU UMAP handles connectivity natively, preserve indexing
+        valid_mask = np.ones(len(proj), dtype=bool)
     
     fig, ax = plt.subplots(figsize=(3.5, 3.5), layout="constrained")
 
@@ -948,7 +976,7 @@ def plot_semantic_manifold(embeddings: np.ndarray, labels: np.ndarray, class_nam
 def plot_paq_attention(image_array, attn_weights, pathology_name: str, experiment_id: str, output_dir: str | Path = "."):
     """Plots cross-attention weight heatmaps overlaid on the input image."""
     configure_nature_style()
-    plt.rcParams.update({"font.size": 7})
+    plt.update({"font.size": 7})
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
 
@@ -971,3 +999,7 @@ def plot_paq_attention(image_array, attn_weights, pathology_name: str, experimen
     
     _save_figure(fig, out / f"paq_attention_{pathology_name.replace(' ', '_')}_{experiment_id}", fmt="png")
     configure_nature_style()
+
+# Clean up visualizer memory
+plt.close('all')
+gc.collect()

@@ -10,7 +10,7 @@ import torch.nn.functional as F
 from scipy.ndimage import uniform_filter1d
 from sklearn.exceptions import UndefinedMetricWarning
 from sklearn.metrics import f1_score
-from sklearn.isotonic import IsotonicRegression  # SOTA AIR კალიბრაციისთვის
+from sklearn.isotonic import IsotonicRegression
 
 from config import log_process
 
@@ -30,7 +30,6 @@ RADLEX_PATHOLOGIES: list[str] = [
 
 
 def format_apa_p_value(p: float) -> str:
-    """Formats p-values according to American Psychological Association (APA) style."""
     if p < 0.001:
         return "< .001"
     formatted = f"{p:.3f}"
@@ -38,7 +37,6 @@ def format_apa_p_value(p: float) -> str:
 
 
 def format_apa_correlation(r: float) -> str:
-    """Formats correlation coefficients according to APA style (omits leading zero)."""
     formatted = f"{r:+.4f}" if r >= 0 else f"{r:.4f}"
     return formatted.replace("0.", ".")
 
@@ -49,7 +47,6 @@ def ensure_radlex_embeddings(
     model_name: str, 
     device: torch.device
 ) -> torch.Tensor:
-    """Loads cached RadLex embeddings, or extracts them from a HuggingFace tokenizer."""
     from transformers import AutoModel, AutoTokenizer
     target_dim = 768
 
@@ -78,10 +75,6 @@ def ensure_radlex_embeddings(
 
 
 def select_adjacency_threshold(labels: np.ndarray, num_classes: int = 14) -> float:
-    """
-    Finds the optimal threshold for the adjacency matrix of a label graph.
-    Identifies the knee-point of graph density across threshold spaces.
-    """
     co = np.zeros((num_classes, num_classes), dtype=np.float64)
     for row in labels:
         idx = np.where(row == 1)[0]
@@ -112,10 +105,6 @@ def build_hybrid_clinical_adjacency(
     self_loops: bool = True,
     alpha_blend: float = 0.7
 ) -> np.ndarray:
-    """
-    Blends empirical label co-occurrences with ontological text similarity
-    to yield a robust normalized adjacency matrix for Graph Cross-Attention.
-    """
     co = np.zeros((num_classes, num_classes), dtype=np.float64)
     for row in labels:
         idx = np.where(row == 1)[0]
@@ -142,7 +131,6 @@ def build_hybrid_clinical_adjacency(
 
 
 def expected_calibration_error(probs: np.ndarray, labels: np.ndarray, n_bins: int = 15) -> np.ndarray:
-    """Computes class-wise Expected Calibration Error (ECE)."""
     ece = []
     for k in range(probs.shape[1]):
         bounds = np.linspace(0, 1, n_bins + 1)
@@ -164,7 +152,6 @@ def bootstrap_metric_ci(
     alpha: float = 0.05,
     seed: int = 42
 ) -> dict[str, float]:
-    """Calculates bootstrap confidence intervals for an evaluation metric."""
     rng = np.random.RandomState(seed)
     N = y_true.shape[0]
     vals = []
@@ -194,7 +181,6 @@ def paired_bootstrap_metric_test(
     n: int = 2000,
     seed: int = 42
 ) -> dict[str, float]:
-    """Performs a paired bootstrap test to check the statistical significance of delta-metrics."""
     rng = np.random.RandomState(seed)
     N = y_true.shape[0]
     diffs = []
@@ -212,7 +198,6 @@ def paired_bootstrap_metric_test(
 
 
 def optimise_thresholds(probs: np.ndarray, labels: np.ndarray, grid_steps: int = 150) -> np.ndarray:
-    """Optimizes F1-score classification decision boundaries class-by-class."""
     n_cls = probs.shape[1]
     thr = np.full(n_cls, 0.5)
     
@@ -236,7 +221,6 @@ def optimise_thresholds(probs: np.ndarray, labels: np.ndarray, grid_steps: int =
 
 
 class EarlyStopping:
-    """Tracks validation metrics to prevent overfitting using standard patience bounds."""
     def __init__(self, patience: int = 10, delta: float = 0.001, path: str = "best.pth"):
         self.patience = patience
         self.delta = delta
@@ -257,13 +241,9 @@ class EarlyStopping:
         return False
 
 
-# ==============================================================================
-# SOTA CLASS-WISE ASYMMETRIC ISOTONIC REGRESSION (AIR) CALIBRATOR
-# ==============================================================================
-
 class ClassWiseAsymmetricIsotonicCalibrator:
     """
-    SOTA Class-Wise Asymmetric Isotonic Regression (AIR) Calibrator.
+    Class-Wise Asymmetric Isotonic Regression (AIR) Calibrator.
     Specifically engineered to correct multi-label probability warping induced 
     by Asymmetric Loss (ASL) without degrading classification thresholds or F1 scores.
     """
@@ -273,9 +253,7 @@ class ClassWiseAsymmetricIsotonicCalibrator:
         self.is_fitted = False
 
     def fit(self, val_probs: np.ndarray, val_labels: np.ndarray) -> ClassWiseAsymmetricIsotonicCalibrator:
-        """Fits an independent Isotonic Regression model per pathology class."""
         self.calibrators = []
-        
         for c in range(self.num_classes):
             ir = IsotonicRegression(
                 y_min=0.0, 
@@ -283,11 +261,9 @@ class ClassWiseAsymmetricIsotonicCalibrator:
                 increasing=True, 
                 out_of_bounds="clip"
             )
-            
             p_c = val_probs[:, c]
             y_c = val_labels[:, c]
             
-            # Microscopic linear perturbation to stabilize regression matrix decomposition
             jitter = np.linspace(-1e-9, 1e-9, len(p_c))
             p_c_stable = np.clip(p_c + jitter, 0.0, 1.0)
             
@@ -298,64 +274,51 @@ class ClassWiseAsymmetricIsotonicCalibrator:
         return self
 
     def calibrate(self, probs: np.ndarray) -> np.ndarray:
-        """Applies fitted isotonic mapping with boundary smoothing."""
         if not self.is_fitted:
             raise ValueError("Calibrator must be fitted on validation data before calibration.")
             
         calibrated_probs = np.zeros_like(probs)
-        
         for c in range(self.num_classes):
             p_c = np.clip(probs[:, c], 0.0, 1.0)
             raw_calibrated = self.calibrators[c].predict(p_c)
-            
-            # Smooth interpolation near the boundary to protect gradient ranking
             calibrated_probs[:, c] = 0.999 * raw_calibrated + 0.001 * p_c
             
         return np.clip(calibrated_probs, 1e-7, 1.0 - 1e-7)
 
 
-# ==============================================================================
-# SOTA CLASS-SPECIFIC CONFORMAL RISK CONTROL (CRC)
-# ==============================================================================
-
 class UncertaintyGatedAdaptiveConformalPredictor:
     """
-    Implements a mathematically rigorous Conformal Risk Control (CRC) framework
-    engineered with class-specific loss constraints (alphas) to prioritize
-    ultra-strict safety (FDR < 5%) for critical conditions while dynamically
-    maximizing coverage (Recall) for chronic pathologies.
+    Implements a Conformal Risk Control (CRC) framework.
+    Upgraded with fully vectorized threshold multiplier searches to avoid nested loop stalls.
     """
     def __init__(
         self, 
-        alpha: float = 0.10,  # Unused legacy argument, overridden by class-wise alphas
+        alpha: float = 0.10, 
         lambda_param: float = 0.6, 
         rejection_quantile: float = 0.10
     ):
         self.lambda_param = lambda_param
         self.rejection_quantile = rejection_quantile
         self.uncertainty_threshold: float | None = None
-        self.global_multipliers: np.ndarray | None = None  # Class-specific multipliers vector
+        self.global_multipliers: np.ndarray | None = None  
         self.class_weights: np.ndarray | None = None
         self.opt_thresholds: np.ndarray | None = None
 
-        # SOTA Class-Wise Risk Boundaries (Alphas):
-        # Ultra-strict FDR control (<5%) for life-threatening acute pathologies,
-        # and optimized relaxed bounds (25-30%) for chronic/stable pathologies.
         self.alphas = np.array([
-            0.25,  # Atelectasis (Chronic/Stable)
-            0.05,  # Cardiomegaly (CRITICAL - Acute Care)
-            0.05,  # Effusion (CRITICAL - Acute Care)
-            0.25,  # Infiltration (Standard)
-            0.25,  # Mass (Standard)
-            0.25,  # Nodule (Standard)
-            0.05,  # Pneumonia (CRITICAL - Life Threatening)
-            0.05,  # Pneumothorax (CRITICAL - Tension Pneumothorax Risk)
-            0.25,  # Consolidation (Standard)
-            0.05,  # Edema (CRITICAL - Pulmonary Edema Risk)
-            0.25,  # Emphysema (Chronic)
-            0.30,  # Fibrosis (Chronic - High Tolerance)
-            0.30,  # Pleural_Thickening (Chronic - High Tolerance)
-            0.30   # Hernia (Chronic - High Tolerance)
+            0.25,  # Atelectasis
+            0.05,  # Cardiomegaly
+            0.05,  # Effusion
+            0.25,  # Infiltration
+            0.25,  # Mass
+            0.25,  # Nodule
+            0.05,  # Pneumonia
+            0.05,  # Pneumothorax
+            0.25,  # Consolidation
+            0.05,  # Edema
+            0.25,  # Emphysema
+            0.30,  # Fibrosis
+            0.30,  # Pleural_Thickening
+            0.30   # Hernia
         ])
 
     def calibrate(
@@ -367,55 +330,59 @@ class UncertaintyGatedAdaptiveConformalPredictor:
         cal_uncertainties: np.ndarray
     ) -> None:
         """
-        Calibrates independent class-specific threshold multipliers (vectorized)
-        to strictly bound the expected False Discovery Rate below independent risk targets.
+        Calibrates independent class-specific threshold multipliers.
+        Vectorized to process candidate multipliers as a 2D matrix.
         """
         self.opt_thresholds = opt_thresholds
         num_classes = cal_probs.shape[1]
         
-        # 1. Determine uncertainty threshold for selective classification
         self.uncertainty_threshold = float(
             np.quantile(cal_uncertainties, 1.0 - self.rejection_quantile)
         )
         
-        # 2. Filter calibration set to include only accepted patient samples
         valid_mask = cal_uncertainties <= self.uncertainty_threshold
         cal_probs_filtered = cal_probs[valid_mask]
         cal_labels_filtered = cal_labels[valid_mask]
         n_cal = max(cal_probs_filtered.shape[0], 1)
         
-        # 3. Calculate class-specific weights based on validation AUROC
         aucs = np.array(validation_aucs)
         self.class_weights = 1.0 + self.lambda_param * (1.0 - aucs)
         
-        # 4. Calibrate independent class-specific multipliers vector
         self.global_multipliers = np.ones(num_classes)
-        multipliers = np.linspace(0.01, 10.0, 2000)
+        multipliers = np.linspace(0.01, 10.0, 2000) # (M,)
         
         for c in range(num_classes):
-            best_m = 10.0  # Conservative safe-bound default
             alpha_c = self.alphas[c]
+            p_c = cal_probs_filtered[:, c] # (N,)
+            y_c_bool = ~cal_labels_filtered[:, c].astype(bool) # (N,)
             
-            for m in multipliers:
-                # Class-specific decision threshold scaling
-                test_thr_c = np.clip(self.opt_thresholds[c] * m * self.class_weights[c], 0.00001, 0.99999)
-                preds_c = cal_probs_filtered[:, c] >= test_thr_c
+            # Vectorized threshold calculation across all 2000 candidate multipliers
+            test_thresholds = np.clip(
+                self.opt_thresholds[c] * multipliers * self.class_weights[c], 
+                0.00001, 
+                0.99999
+            ) # (M,)
+            
+            # Broadcast comparison: Shape (N, M)
+            preds_matrix = p_c[:, np.newaxis] >= test_thresholds[np.newaxis, :]
+            
+            # Count false discoveries: Shape (M,)
+            fps_vector = (preds_matrix & y_c_bool[:, np.newaxis]).sum(axis=0)
+            
+            empirical_risk = fps_vector / n_cal
+            rc_bounds = (n_cal / (n_cal + 1)) * empirical_risk + (1.0 / (n_cal + 1))
+            
+            # Find the first index where the risk constraint is met
+            satisfying_indices = np.where(rc_bounds <= alpha_c)[0]
+            if len(satisfying_indices) > 0:
+                best_m = float(multipliers[satisfying_indices[0]])
+            else:
+                best_m = 10.0
                 
-                # Compute false discoveries for class c
-                fps_c = (preds_c & ~cal_labels_filtered[:, c].astype(bool)).sum()
-                empirical_risk = fps_c / n_cal
-                
-                # Monotonic Conformal Risk Control expectation bound
-                rc_bound = (n_cal / (n_cal + 1)) * empirical_risk + (1.0 / (n_cal + 1))
-                
-                if rc_bound <= alpha_c:
-                    best_m = m
-                    break
-                    
             self.global_multipliers[c] = best_m
             
         log_process("conformal", "class_wise_crc_calibration_completed", 
-                    calibrated_multipliers=list(np.round(self.global_multipliers, 4)))
+                    calibrated_multipliers=[float(x) for x in np.round(self.global_multipliers, 4)])
 
     def predict_sets(
         self, 
@@ -423,17 +390,11 @@ class UncertaintyGatedAdaptiveConformalPredictor:
         test_uncertainties: np.ndarray, 
         force_non_empty: bool = True
     ) -> dict[str, np.ndarray]:
-        """
-        Maps calibrated model probabilities to conformal prediction sets
-        using independent class-specific calibrated risk multipliers.
-        """
         if self.uncertainty_threshold is None or self.class_weights is None or self.opt_thresholds is None:
             raise ValueError("Conformal predictor must be calibrated before prediction.")
 
-        # Determine clinical acceptance based on predictive entropy safety gate
         accepted_mask = test_uncertainties <= self.uncertainty_threshold
         
-        # Apply independent, class-wise calibrated CRC threshold multipliers (vectorized)
         final_thr = np.clip(
             self.opt_thresholds * self.global_multipliers * self.class_weights, 
             0.00001, 
@@ -441,13 +402,11 @@ class UncertaintyGatedAdaptiveConformalPredictor:
         )
         sets = test_probs >= final_thr
         
-        # Prevent empty sets for accepted samples to assist clinicians with diagnostic candidates
         if force_non_empty:
             empty_idx = (sets.sum(axis=1) == 0) & accepted_mask
             if empty_idx.any():
                 sets[empty_idx, np.argmax(test_probs[empty_idx], axis=1)] = True
         
-        # Abstention logic remains decoupled
         return {
             "include_pos": sets,
             "accepted": accepted_mask

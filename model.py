@@ -14,7 +14,6 @@ import torch.nn.functional as F
 def get_2d_sincos_pos_embed(
     embed_dim: int, grid_size: int, temperature: float = 10000.0
 ) -> torch.Tensor:
-    """Generates a 2D sine-cosine spatial positional embedding grid."""
     grid_h = np.arange(grid_size, dtype=np.float32)
     grid_w = np.arange(grid_size, dtype=np.float32)
     grid = np.meshgrid(grid_w, grid_h)
@@ -43,22 +42,18 @@ def get_evidential_metrics(
     z_v: torch.Tensor, priors: torch.Tensor | np.ndarray | None = None, W: float = 2.0
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """
-    Replaces Binomial Subjective Logic with standard sigmoid-based probabilities
-    and normalized predictive Shannon entropy. Preserves the function signature 
-    to prevent breaking existing validation downstream dependencies.
+    Calculates multi-label evidential metrics.
     
     Returns:
         prob: Sigmoid probabilities.
-        epistemic: Shannon entropy per class scaled to [0, 1] as a proxy for uncertainty.
+        epistemic: Shannon entropy per class rescaled to [0, 1].
         aleatoric: Statistical binomial variance p * (1 - p).
     """
     prob = torch.sigmoid(z_v)
     eps = 1e-8
     
-    # Aleatoric Uncertainty: Binomial variance of predictions
     aleatoric = prob * (1.0 - prob)
     
-    # Epistemic Uncertainty: Shannon entropy per class rescaled to [0, 1] range using base-2 logarithm
     entropy = - (prob * torch.log2(prob + eps) + (1.0 - prob) * torch.log2(1.0 - prob + eps))
     epistemic = entropy.clamp(min=0.0, max=1.0)
     
@@ -169,15 +164,12 @@ class CXR_Synapse_Foundation(nn.Module):
         self.register_buffer("adjacency_mask", torch.zeros(num_classes, num_classes))
 
     def set_adjacency_mask(self, adj_norm_np: np.ndarray) -> None:
-        """Loads a normalized adjacency matrix into the local buffer."""
         self.adjacency_mask.copy_(torch.from_numpy(adj_norm_np).float())
 
-    def set_radlex_embeddings(self, emb: torch.Tensor) -> None:
-        """Loads precomputed clinical RadLex text embeddings into the local buffer."""
-        self.radlex_emb.copy_(emb)
+    def set_radlex_embeddings(self, mt_emb: torch.Tensor) -> None:
+        self.radlex_emb.copy_(mt_emb)
 
     def set_priors(self, priors_np: np.ndarray) -> None:
-        """Loads class prevalence priors into the local buffer."""
         self.priors.copy_(torch.from_numpy(priors_np).float())
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -195,11 +187,6 @@ class CXR_Synapse_Foundation(nn.Module):
 # ==============================================================================
 
 class AsymmetricLoss(nn.Module):
-    """
-    Asymmetric Loss (ASL) for Multi-Label Classification.
-    Decouples positive and negative focusing parameter dynamics to preserve
-    stable clinical gradient flow on highly skewed medical distributions.
-    """
     def __init__(
         self,
         gamma_neg: float = 4.0,
@@ -214,24 +201,16 @@ class AsymmetricLoss(nn.Module):
         self.eps = eps
 
     def forward(self, x: torch.Tensor, y: torch.Tensor, epoch: int | None = None) -> torch.Tensor:
-        """
-        Calculates loss over target-decoupled sigmoid outputs.
-        Accepts the 'epoch' argument optionally to preserve API compatibility.
-        """
-        # 1. Compute baseline sigmoid probabilities
         xs_pos = torch.sigmoid(x)
         xs_neg = 1.0 - xs_pos
 
-        # 2. Asymmetric shifting/clipping margin for easy negative classes
         if self.clip is not None and self.clip > 0:
             xs_neg = (xs_neg + self.clip).clamp(max=1.0)
 
-        # 3. Standard Bilateral Cross Entropy components
         loss_pos = y * torch.log(xs_pos.clamp(min=self.eps))
         loss_neg = (1.0 - y) * torch.log(xs_neg.clamp(min=self.eps))
         loss = loss_pos + loss_neg
 
-        # 4. Target-decoupled asymmetric focal focusing scale
         if self.gamma_pos > 0 or self.gamma_neg > 0:
             if self.gamma_pos > 0:
                 factors_pos = (1.0 - xs_pos) ** self.gamma_pos

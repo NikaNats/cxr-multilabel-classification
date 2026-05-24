@@ -49,7 +49,6 @@ def train_single_model(
     model = CXR_Synapse_Foundation(num_classes=14).to(DEVICE)
     model.set_adjacency_mask(adj_norm_np)
 
-    # Acquire and detach frozen text embeddings
     radlex = ensure_radlex_embeddings(
         "radlex_embeddings_14.pth",
         RADLEX_PATHOLOGIES,
@@ -63,7 +62,6 @@ def train_single_model(
     priors = np.clip(priors, 1e-4, 1.0 - 1e-4)
     model.set_priors(priors)
 
-    # Instantiate SOTA Asymmetric Loss
     loss_fn = AsymmetricLoss(
         gamma_neg=4.0, 
         gamma_pos=1.0, 
@@ -120,13 +118,19 @@ def train_single_model(
         )
 
         for feats, lbls in pbar:
-            feats = feats.to(DEVICE)
-            lbls = lbls.to(DEVICE).float()
+            feats = feats.to(DEVICE, non_blocking=True)
+            lbls = lbls.to(DEVICE, non_blocking=True).float()
+            
+            # GPU-Accelerated Latent Space Jittering
+            # Relocating noise generation and addition here eliminates CPU-bound data pipeline stalls.
+            if train_emb_dataset.split == "train" and train_emb_dataset.jitter_eps > 0:
+                noise = torch.randn_like(feats) * train_emb_dataset.jitter_eps
+                feats = feats + noise
+
             optimizer.zero_grad(set_to_none=True)
 
             with torch.amp.autocast("cuda", enabled=(DEVICE.type == "cuda")):
                 z_v = model(feats)
-                # Apply asymmetric optimization
                 classification_loss = loss_fn(z_v, lbls, epoch)
 
                 current_queries = model.pathology_router.text_proj(model.radlex_emb)
@@ -137,7 +141,6 @@ def train_single_model(
                 q_current = F.log_softmax(current_topology / 0.1, dim=-1)
                 anchor_loss = F.kl_div(q_current, p_target, reduction="batchmean")
 
-                # Balanced multiobjective optimization
                 loss = classification_loss + (0.5 * anchor_loss)
 
             if not torch.isfinite(loss):
@@ -201,7 +204,6 @@ def train_ensemble(
     val_loader: DataLoader,
     num_workers: int,
 ) -> list[str]:
-    """Trains an ensemble of foundation models sequentially over different random seeds."""
     ensemble_checkpoints = []
     for seed in seeds:
         ckpt = train_single_model(

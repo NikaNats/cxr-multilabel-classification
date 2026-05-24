@@ -17,8 +17,8 @@ from utils import expected_calibration_error
 class DeepEnsembleTTAEvaluator:
     """
     Bayesian Deep Ensemble Evaluator utilizing Test-Time Augmentation (TTA).
-    Calculates SOTA Predictive Shannon Entropy over the ensemble-averaged 
-    probabilities to obtain a calibrated, robust measure of total predictive uncertainty.
+    Calculates Predictive Shannon Entropy natively on the GPU to avoid
+    costly host-device memory synchronizations in the inner loops.
     """
     def __init__(
         self,
@@ -34,7 +34,9 @@ class DeepEnsembleTTAEvaluator:
         self.T = num_mc_passes
         self.models: list[nn.Module] = []
         self.priors = priors
-        self.temperature = temperature
+        self.temperature = (
+            torch.as_tensor(temperature, device=device_) if temperature is not None else None
+        )
         
         for ckpt in checkpoint_paths:
             m = model_class(num_classes=14).to(device_)
@@ -54,16 +56,15 @@ class DeepEnsembleTTAEvaluator:
 
     @torch.no_grad()
     def evaluate(self, loader: DataLoader, thresholds: np.ndarray | None = None) -> dict[str, Any]:
-        """Runs Bayesian inference over the dataloader and returns calibrated evaluation metrics."""
+        """Runs GPU-accelerated Bayesian inference over the dataloader."""
         all_probs_list, all_lbls, all_entropies = [], [], []
         
         for feats, lbls in tqdm(loader, desc="  Bayesian Inference", leave=False):
-            feats = feats.to(self.device)
+            feats = feats.to(self.device, non_blocking=True)
             batch_probs = []
 
             for m in self.models:
                 m.eval()
-                # Activate Monte Carlo Dropout layers during inference to sample predictive space
                 for module in m.modules():
                     if isinstance(module, nn.Dropout): 
                         module.train()
@@ -71,38 +72,34 @@ class DeepEnsembleTTAEvaluator:
                 for _ in range(self.T):
                     z_v = m(feats)
                     
-                    # Apply temperature scaling if temperature calibration is active
                     if self.temperature is not None:
-                        temp_t = torch.as_tensor(self.temperature, device=self.device, dtype=z_v.dtype)
-                        z_v = z_v / temp_t
+                        z_v = z_v / self.temperature
                         
-                    # Extract standard calibrated probabilities
-                    probs_pass = torch.sigmoid(z_v).cpu().numpy()
+                    probs_pass = torch.sigmoid(z_v)
                     batch_probs.append(probs_pass)
 
-            # Stack along evaluation dimension. Shape: (M * T, B, C)
-            batch_probs_arr = np.stack(batch_probs, axis=0)
+            # Stack along evaluation dimension on the GPU. Shape: (M * T, B, C)
+            batch_probs_tensor = torch.stack(batch_probs, dim=0)
             
-            # SOTA Ensemble Averaging in Probability Space to respect Jensen's inequality
-            mean_probs = np.mean(batch_probs_arr, axis=0) # Shape: (B, C)
+            # Compute ensemble average in GPU space
+            mean_probs = torch.mean(batch_probs_tensor, dim=0) # Shape: (B, C)
             
-            # Compute Predictive Shannon Entropy over the averaged ensemble probabilities H(p_bar)
+            # Compute Predictive Shannon Entropy on the GPU
             eps = 1e-8
             predictive_entropy = - (
-                mean_probs * np.log2(mean_probs + eps) + 
-                (1.0 - mean_probs) * np.log2(1.0 - mean_probs + eps)
+                mean_probs * torch.log2(mean_probs + eps) + 
+                (1.0 - mean_probs) * torch.log2(1.0 - mean_probs + eps)
             ) # Shape: (B, C)
             
-            all_probs_list.append(mean_probs)
-            all_lbls.append(lbls.numpy())
-            all_entropies.append(predictive_entropy)
+            all_probs_list.append(mean_probs.cpu())
+            all_lbls.append(lbls)
+            all_entropies.append(predictive_entropy.cpu())
 
-        # Concatenate across batches to yield full dataset metrics. Shape: (N, C)
-        predictive_mean = np.concatenate(all_probs_list, axis=0)
-        lbls = np.concatenate(all_lbls, axis=0)
-        predictive_entropies = np.concatenate(all_entropies, axis=0)
+        # Concatenate arrays once at the end
+        predictive_mean = torch.cat(all_probs_list, dim=0).numpy()
+        lbls = torch.cat(all_lbls, dim=0).numpy()
+        predictive_entropies = torch.cat(all_entropies, dim=0).numpy()
         
-        # Aggregate uncertainty across classes for selective classification. Shape: (N,)
         total_epistemic_uncertainty = predictive_entropies.mean(axis=1)
 
         if thresholds is None: 
@@ -119,7 +116,7 @@ class DeepEnsembleTTAEvaluator:
             "per_class_ece": ece, 
             "predictive_mean": predictive_mean, 
             "labels": lbls,
-            "epistemic_variance": total_epistemic_uncertainty # Mapped as 'epistemic_variance' to maintain compatibility
+            "epistemic_variance": total_epistemic_uncertainty
         }
 
 
@@ -137,8 +134,7 @@ def validate(
     active_priors = model.priors if hasattr(model, "priors") else priors
     
     for feats, lbls in tqdm(loader, desc="  Val", leave=False):
-        z_v = model(feats.to(device_))
-        # Call get_evidential_metrics which maps to our calibrated sigmoidal representation
+        z_v = model(feats.to(device_, non_blocking=True))
         probs, _, _ = get_evidential_metrics(z_v, active_priors)
         all_p.append(probs.cpu().numpy())
         all_l.append(lbls.numpy())
