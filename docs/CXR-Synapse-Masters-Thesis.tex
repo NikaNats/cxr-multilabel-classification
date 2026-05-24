@@ -63,7 +63,7 @@
   citecolor=blue,
   urlcolor=blue,
   pdftitle={გულ-მკერდის რენტგენოგრამების მრავალნიშნიანი კლასიფიკაცია LISA და PaQ ალგორითმების გამოყენებით, კონფორმული უსაფრთხოების გარანტიებით},
-  pdfauthor={ნიკა}
+  pdfauthor={ნიკა ნაცვლიშვილი}
 }
 
 % ========================================
@@ -167,7 +167,7 @@
 \chapter*{აკადემიური პატიოსნების დეკლარაცია}
 \addcontentsline{toc}{chapter}{აკადემიური პატიოსნების დეკლარაცია}
 ვაცხადებ, რომ წინამდებარე სამაგისტრო ნაშრომი წარმოადგენს ჩემს დამოუკიდებელ ნაშრომს და მასში გამოყენებული ყველა წყარო სათანადოდ არის მითითებული და ციტირებული აკადემიური სტანდარტების დაცვით. 
-ჩემს მიერ წარმოდგენილი ექსპერიმენტული მონაცემები, სტატისტიკური ანალიზი და პროგრამული კოდი ავთენტურია. ნაშრომში არ არის გამოყენებული პლაგიატი ან მონაცემთა ფალსიფიკაცია, რაც არღვევს უნივერსიტეტის აკადემიური ეთიკის პოლიტიკას.
+ჩემს მიერ წარმოდგენილი ექსპერიმენტული მონაცემები, სტატისტიკური ანალიზი და პროგრამული კოდი ავთენტურია (Run ID: aca07655ab7c). ნაშრომში არ არის გამოყენებული პლაგიატი ან მონაცემთა ფალსიფიკაცია, რაც არღვევს უნივერსიტეტის აკადემიური ეთიკის პოლიტიკას.
 
 \vspace{1.2cm}
 \noindent ხელმოწერა: \rule{5cm}{0.4pt} \hfill თარიღი: \rule{3.5cm}{0.4pt}
@@ -179,7 +179,7 @@
 \addcontentsline{toc}{chapter}{ანოტაცია}
 გულ-მკერდის რენტგენოგრამების (CXR) მრავალნიშნიანი კლასიფიკაცია თანამედროვე სამედიცინო ხელოვნური ინტელექტის ერთ-ერთ უმნიშვნელოვანეს გამოწვევას წარმოადგენს. ძირითად პრობლემებს შორისაა მონაცემთა კლასობრივი დისბალანსი, რეპრეზენტაციული დრიფტი (Representational Drift) და გაყინული ვიზუალური ფონდური მოდელების ტენდენცია გადაჭარბებული თავდაჯერებულობისკენ (Overconfidence). წინამდებარე ნაშრომში წარმოდგენილია \textbf{შემოთავაზებული მოდელი} — კლინიკურად ორიენტირებული არქიტექტურა, რომელიც პირველად აერთიანებს LISA (Language-Invariant Semantic Anchoring) რეგულარიზაციას BioViL-T ენობრივი პრიორებით, PaQ (Pathology-as-Query) სივრცითი ჯვარედინი ყურადღების (Cross-Attention) მექანიზმს ორგანზომილებიანი სინუს-კოსინუსური პოზიციური ემბედინგებით და ბინომიალურ სუბიექტურ ლოგიკას ეპისტემური გაურკვევლობის ზუსტი რაოდენობრივი დეკუპლირებისთვის.
 
-ჩატარებულმა ექსპერიმენტებმა ChestMNIST მონაცემთა ბაზაზე აჩვენა, რომ შემოთავაზებული მოდელი წარმატებით არღვევს ტრადიციულ რეპრეზენტაციულ ბარიერებს და აღწევს მრავალლეიბლიან AUC 0.7916-ს (95\% CI: [0.7703, 0.8046]). კალიბრაციის კუთხით მიღწეულია კლასობრივი ECE 0.1585. ნაშრომში ასევე ინტეგრირებულია გაურკვევლობით მართული კონფორმალური რისკის კონტროლის სისტემა (Uncertainty-Gated Adaptive Conformal Predictor). შემოთავაზებული მიდგომით მიღწეულია კლასთა საშუალო კონფორმალური დაფარვა 35.1\%, პაციენტის დონის დაფარვა 61.9\%, ხოლო პროგნოზების საშუალო სიმრავლის ზომა შეადგენს 1.55-ს, რაც გამორიცხავს განგაშის გადაღლას (Alert Fatigue). შედეგების ვალიდურობა და ეთიკურობა დადასტურებულია 2000-ჯერადი Bootstrap რესემპლინგით, დაწყვილებული არაპარამეტრული ტესტებითა და Blake2b ბიტ-ზუსტი ფორენზიკული დედუპლიკაციით. აღნიშნული სტატისტიკურად სარწმუნო (p < .001) არქიტექტურა ქმნის საიმედო საფუძველს სანდო ხელოვნური ინტელექტის (Trustworthy AI) სისტემების მაღალი რისკის მქონე კლინიკურ პრაქტიკაში უსაფრთხოდ დასანერგად.
+ჩატარებულმა ექსპერიმენტებმა ChestMNIST მონაცემთა ბაზაზე (გაშვება: aca07655ab7c) აჩვენა, რომ შემოთავაზებული მოდელი წარმატებით არღვევს ტრადიციულ რეპრეზენტაციულ ბარიერებს და აღწევს მრავალლეიბლიან მაკრო-საშუალო AUC 0.7916-ს (95\% ნდობის ინტერვალი [0.7703, 0.8046]). კალიბრაციის კუთხით მიღწეულია კლასობრივი კალიბრაციის შეცდომა (Mean ECE) 0.1585. ნაშრომში ასევე ინტეგრირებულია გაურკვევლობით მართული კონფორმალური რისკის კონტროლის სისტემა (Uncertainty-Gated Adaptive Conformal Predictor). შემოთავაზებული მიდგომით მიღწეულია კლასთა საშუალო კონფორმალური დაფარვა 35.1\%, პაციენტის დონის დაფარვა 61.9\%, ხოლო პროგნოზების საშუალო სიმრავლის ზომა შეადგენს 1.55-ს, რაც ეფექტურად ამცირებს კლინიკური განგაშის გადაღლას (Alert Fatigue). შედეგების ვალიდურობა და ეთიკურობა დადასტურებულია 2000-ჯერადი Bootstrap რესემპლინგით, დაწყვილებული არაპარამეტრული ტესტებითა და Blake2b ბიტ-ზუსტი ფორენზიკული დედუპლიკაციით. აღნიშნული სტატისტიკურად სარწმუნო ($p < .001$) არქიტექტურა ქმნის საიმედო საფუძველს სანდო ხელოვნური ინტელექტის (Trustworthy AI) სისტემების მაღალი რისკის მქონე კლინიკურ პრაქტიკაში უსაფრთხოდ დასანერგად.
 
 \noindent\textbf{საკვანძო სიტყვები:}
 გულ-მკერდის რენტგენოგრაფია, მრავალნიშნიანი კლასიფიკაცია, Pathology-as-Query, LISA, კალიბრაცია, ევინდენციური ღრმა სწავლება, კონფორმალური უსაფრთხოება, სუბიექტური ლოგიკა.
@@ -193,7 +193,7 @@
 
 Chest X-ray (CXR) multi-label classification remains a critical clinical challenge due to extreme class imbalance, representational drift, and model overconfidence in frozen vision backbones. This thesis proposes a highly integrated, clinically grounded machine learning framework that combines LISA (Language-Invariant Semantic Anchoring) parameterized by BioViL-T textual priors, PaQ (Pathology-as-Query) spatial cross-attention operating on 2D sine-cosine positional grids, and Binomial Subjective Logic to decouple epistemic and aleatoric uncertainties.
 
-Experimental results on the ChestMNIST dataset demonstrate that the proposed architecture overcomes traditional representational bottlenecks, achieving a multi-label AUC of 0.7916 (95\% CI: [0.7703, 0.8046]). In terms of calibration, a class-average ECE of 0.1585 was achieved. Furthermore, the framework integrates an Uncertainty-Gated Adaptive Conformal Predictor, yielding a class-average coverage of 35.1\%, a patient-level coverage of 61.9\%, and a highly practical mean prediction set size of 1.55, thereby mitigating clinician alert fatigue. The statistical integrity of these findings is rigorously validated using 2000-fold paired non-parametric bootstrap resampling (p < .001) and a bit-exact Blake2b cryptographic forensic audit. The statistically significant results position this architecture as a reliable blueprint for deploying Trustworthy AI systems in high-stakes diagnostic environments.
+Experimental results on the ChestMNIST dataset (Run ID: aca07655ab7c) demonstrate that the proposed architecture overcomes traditional representational bottlenecks, achieving a multi-label macro-averaged AUC of 0.7916 (95\% Bootstrap Confidence Interval: [0.7703, 0.8046]). In terms of calibration, a class-average ECE of 0.1585 was achieved. Furthermore, the framework integrates an Uncertainty-Gated Adaptive Conformal Predictor, yielding a class-average coverage of 35.1\%, a patient-level coverage of 61.9\%, and a highly practical mean prediction set size of 1.55, thereby mitigating clinician alert fatigue. The statistical integrity of these findings is rigorously validated using 2000-fold paired non-parametric bootstrap resampling ($p < .001$) and a bit-exact Blake2b cryptographic forensic audit. The statistically significant results position this architecture as a reliable blueprint for deploying Trustworthy AI systems in high-stakes diagnostic environments.
 
 \noindent\textbf{Keywords:}
 Chest X-ray, multi-label classification, Pathology-as-Query, LISA, calibration, Evidential Deep Learning, Conformal Prediction, Subjective Logic.
