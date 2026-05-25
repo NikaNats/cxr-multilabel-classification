@@ -9,7 +9,6 @@ import torch
 import torch.nn.functional as F
 from scipy.ndimage import uniform_filter1d
 from sklearn.exceptions import UndefinedMetricWarning
-from sklearn.metrics import f1_score
 from sklearn.isotonic import IsotonicRegression
 
 from config import log_process
@@ -82,8 +81,7 @@ def select_adjacency_threshold(labels: np.ndarray, num_classes: int = 14) -> flo
             for j in idx:
                 co[i, j] += 1.0
 
-    co_sym = (co + co.T) / 2.0
-    prob = co_sym / np.maximum(co_sym.sum(1, keepdims=True), 1.0)
+    prob = co / np.maximum(co.sum(1, keepdims=True), 1.0)
 
     thresholds = np.linspace(0.01, 0.95, 200)
     densities = [(prob >= t).mean() for t in thresholds]
@@ -111,8 +109,8 @@ def build_hybrid_clinical_adjacency(
         for i in idx:
             for j in idx:
                 co[i, j] += 1.0
-    co_sym = (co + co.T) / 2.0
-    prob_emp = co_sym / np.maximum(co_sym.sum(1, keepdims=True), 1.0)
+                
+    prob_emp = co / np.maximum(co.sum(1, keepdims=True), 1.0)
     
     with torch.no_grad():
         norm_emb = F.normalize(radlex_emb, p=2, dim=-1)
@@ -120,7 +118,9 @@ def build_hybrid_clinical_adjacency(
     
     hybrid_prob = alpha_blend * prob_emp + (1.0 - alpha_blend) * sem_sim
     
-    adj = (hybrid_prob >= threshold).astype(np.float64) * hybrid_prob
+    hybrid_prob_sym = (hybrid_prob + hybrid_prob.T) / 2.0
+    
+    adj = (hybrid_prob_sym >= threshold).astype(np.float64) * hybrid_prob_sym
     if self_loops:
         adj += np.eye(num_classes)
 
@@ -137,7 +137,11 @@ def expected_calibration_error(probs: np.ndarray, labels: np.ndarray, n_bins: in
         ek = 0.0
         for b_idx in range(n_bins):
             lo, hi = bounds[b_idx], bounds[b_idx + 1]
-            m = (probs[:, k] >= lo) & (probs[:, k] < hi)
+            if b_idx == n_bins - 1:
+                m = (probs[:, k] >= lo) & (probs[:, k] <= hi)
+            else:
+                m = (probs[:, k] >= lo) & (probs[:, k] < hi)
+                
             if m.sum() > 0:
                 ek += m.mean() * abs(labels[m, k].mean() - probs[m, k].mean())
         ece.append(ek)
@@ -198,23 +202,37 @@ def paired_bootstrap_metric_test(
 
 
 def optimise_thresholds(probs: np.ndarray, labels: np.ndarray, grid_steps: int = 150) -> np.ndarray:
-    n_cls = probs.shape[1]
+    """
+    Optimised Threshold Finder utilizing vectorized matrix operations.
+    Fully compatible with floating-point label matrices (float32/float64).
+    """
+    n_samples, n_cls = probs.shape
     thr = np.full(n_cls, 0.5)
     
     for k in range(n_cls):
-        best_f1 = 0.0
-        if labels[:, k].sum() == 0:
+        y_true_bool = labels[:, k].astype(bool)
+        total_pos = y_true_bool.sum()
+        if total_pos == 0:
             continue
         
         grid = np.unique(np.percentile(probs[:, k], np.linspace(10, 99.9, grid_steps)))
         grid = np.clip(grid, 0.00001, 0.99999)
         
-        for t in grid:
-            f = f1_score(labels[:, k], (probs[:, k] >= t).astype(int), zero_division=0)
-            if f > best_f1: 
-                best_f1, thr[k] = f, t
-                
-        if best_f1 == 0.0:
+        preds = probs[:, k, np.newaxis] >= grid[np.newaxis, :]
+        
+        tp = (preds & y_true_bool[:, np.newaxis]).sum(axis=0)
+        fp = (preds & (~y_true_bool)[:, np.newaxis]).sum(axis=0)
+        fn = ((~preds) & y_true_bool[:, np.newaxis]).sum(axis=0)
+        
+        denominator = 2 * tp + fp + fn
+        f1_scores = np.zeros_like(grid)
+        valid_mask = denominator > 0
+        f1_scores[valid_mask] = (2 * tp[valid_mask]) / denominator[valid_mask]
+        
+        best_idx = np.argmax(f1_scores)
+        if f1_scores[best_idx] > 0.0:
+            thr[k] = grid[best_idx]
+        else:
             thr[k] = np.clip(np.percentile(probs[:, k], 99.5) + 1e-5, 0.00001, 0.99999)
             
     return thr
@@ -244,8 +262,6 @@ class EarlyStopping:
 class ClassWiseAsymmetricIsotonicCalibrator:
     """
     Class-Wise Asymmetric Isotonic Regression (AIR) Calibrator.
-    Specifically engineered to correct multi-label probability warping induced 
-    by Asymmetric Loss (ASL) without degrading classification thresholds or F1 scores.
     """
     def __init__(self, num_classes: int = 14):
         self.num_classes = num_classes
@@ -289,7 +305,6 @@ class ClassWiseAsymmetricIsotonicCalibrator:
 class UncertaintyGatedAdaptiveConformalPredictor:
     """
     Implements a Conformal Risk Control (CRC) framework.
-    Upgraded with fully vectorized threshold multiplier searches to avoid nested loop stalls.
     """
     def __init__(
         self, 
@@ -329,10 +344,6 @@ class UncertaintyGatedAdaptiveConformalPredictor:
         validation_aucs: np.ndarray | list[float], 
         cal_uncertainties: np.ndarray
     ) -> None:
-        """
-        Calibrates independent class-specific threshold multipliers.
-        Vectorized to process candidate multipliers as a 2D matrix.
-        """
         self.opt_thresholds = opt_thresholds
         num_classes = cal_probs.shape[1]
         
@@ -349,30 +360,25 @@ class UncertaintyGatedAdaptiveConformalPredictor:
         self.class_weights = 1.0 + self.lambda_param * (1.0 - aucs)
         
         self.global_multipliers = np.ones(num_classes)
-        multipliers = np.linspace(0.01, 10.0, 2000) # (M,)
+        multipliers = np.linspace(0.01, 10.0, 2000)
         
         for c in range(num_classes):
             alpha_c = self.alphas[c]
-            p_c = cal_probs_filtered[:, c] # (N,)
-            y_c_bool = ~cal_labels_filtered[:, c].astype(bool) # (N,)
+            p_c = cal_probs_filtered[:, c]
+            y_c_bool = ~cal_labels_filtered[:, c].astype(bool)
             
-            # Vectorized threshold calculation across all 2000 candidate multipliers
             test_thresholds = np.clip(
                 self.opt_thresholds[c] * multipliers * self.class_weights[c], 
                 0.00001, 
                 0.99999
-            ) # (M,)
+            )
             
-            # Broadcast comparison: Shape (N, M)
             preds_matrix = p_c[:, np.newaxis] >= test_thresholds[np.newaxis, :]
-            
-            # Count false discoveries: Shape (M,)
             fps_vector = (preds_matrix & y_c_bool[:, np.newaxis]).sum(axis=0)
             
             empirical_risk = fps_vector / n_cal
             rc_bounds = (n_cal / (n_cal + 1)) * empirical_risk + (1.0 / (n_cal + 1))
             
-            # Find the first index where the risk constraint is met
             satisfying_indices = np.where(rc_bounds <= alpha_c)[0]
             if len(satisfying_indices) > 0:
                 best_m = float(multipliers[satisfying_indices[0]])
@@ -405,7 +411,9 @@ class UncertaintyGatedAdaptiveConformalPredictor:
         if force_non_empty:
             empty_idx = (sets.sum(axis=1) == 0) & accepted_mask
             if empty_idx.any():
-                sets[empty_idx, np.argmax(test_probs[empty_idx], axis=1)] = True
+                row_indices = np.where(empty_idx)[0]
+                col_indices = np.argmax(test_probs[empty_idx], axis=1)
+                sets[row_indices, col_indices] = True
         
         return {
             "include_pos": sets,

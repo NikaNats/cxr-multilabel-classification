@@ -10,7 +10,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import optim
-from torch.optim.swa_utils import SWALR, AveragedModel
+from torch.optim.swa_utils import SWALR, AveragedModel, update_bn
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 
@@ -73,7 +73,7 @@ def train_single_model(
     for name, param in model.named_parameters():
         if not param.requires_grad:
             continue
-        if len(param.shape) == 1 or name.endswith(".bias") or "pos_embed" in name:
+        if param.ndim == 0 or len(param.shape) == 1 or name.endswith(".bias") or "pos_embed" in name:
             no_decay_params.append(param)
         else:
             decay_params.append(param)
@@ -91,6 +91,7 @@ def train_single_model(
         semantic_anchor = F.cosine_similarity(
             radlex_ref.unsqueeze(1), radlex_ref.unsqueeze(0), dim=-1
         )
+        p_target = F.softmax(semantic_anchor / 0.1, dim=-1)
 
     total_steps = CFG["num_epochs"] * len(train_loader)
     warmup_steps = CFG["warmup_steps"]
@@ -121,8 +122,6 @@ def train_single_model(
             feats = feats.to(DEVICE, non_blocking=True)
             lbls = lbls.to(DEVICE, non_blocking=True).float()
             
-            # GPU-Accelerated Latent Space Jittering
-            # Relocating noise generation and addition here eliminates CPU-bound data pipeline stalls.
             if train_emb_dataset.split == "train" and train_emb_dataset.jitter_eps > 0:
                 noise = torch.randn_like(feats) * train_emb_dataset.jitter_eps
                 feats = feats + noise
@@ -137,7 +136,6 @@ def train_single_model(
                 norm_queries = F.normalize(current_queries, p=2, dim=-1)
                 current_topology = torch.matmul(norm_queries, norm_queries.t())
 
-                p_target = F.softmax(semantic_anchor / 0.1, dim=-1)
                 q_current = F.log_softmax(current_topology / 0.1, dim=-1)
                 anchor_loss = F.kl_div(q_current, p_target, reduction="batchmean")
 
@@ -168,10 +166,13 @@ def train_single_model(
         if epoch >= CFG["swa_start"]:
             swa_model.update_parameters(model)
             swa_scheduler.step()
+            update_bn(train_loader, swa_model, device=DEVICE)
 
         eval_m = swa_model if epoch >= CFG["swa_start"] else model
         v_auc, v_f1, _, _, _, _ = validate(eval_m, val_loader, DEVICE, priors=priors)
-        saved = early(v_auc, eval_m)
+
+        model_to_save = eval_m.module if isinstance(eval_m, AveragedModel) else eval_m
+        saved = early(v_auc, model_to_save)
 
         swa_t = "[SWA]" if epoch >= CFG["swa_start"] else "     "
         mean_loss = run_loss / max(valid_steps, 1)
@@ -189,8 +190,9 @@ def train_single_model(
         if early.early_stop:
             break
 
-    del model, optimizer, scaler
-    torch.cuda.empty_cache()
+    del model, optimizer, scaler, swa_model
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
     gc.collect()
 
     return ckpt_path
