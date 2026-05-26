@@ -90,7 +90,7 @@ class DeepEnsembleMCDropoutEvaluator:
                     pass_entropies.append(pass_ent)
 
             batch_probs_tensor = torch.stack(batch_probs, dim=0)
-            mean_probs = torch.mean(batch_probs_tensor, dim=0) # საშუალო ალბათობა (B, C)
+            mean_probs = torch.mean(batch_probs_tensor, dim=0)
             
             predictive_entropy = - (
                 mean_probs * torch.log2(mean_probs + eps) + 

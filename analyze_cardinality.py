@@ -16,7 +16,7 @@ def analyze_split_cardinality(
         return
 
     data = torch.load(file_path, map_location="cpu", weights_only=True)
-    labels = data["labels"].numpy().astype(np.int32)  # Shape: (N, 14)
+    labels = data["labels"].numpy().astype(np.int32)
     
     total_samples = labels.shape[0]
     

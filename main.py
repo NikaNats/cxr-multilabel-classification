@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 import os
@@ -77,7 +76,6 @@ def run_forensic_visual_audit(
     """Generates a detailed forensic visual audit report of the uncertainty dynamics."""
     audit_report = []
 
-    # --- Audit of Panel C: Uncertainty vs. Conformal Set Size ---
     set_sizes = conformal_sets.sum(axis=1)
     corr, p_val = spearmanr(test_epistemic, set_sizes)
     audit_report.append("[Panel C] Uncertainty vs. Set Size Correlation:")
@@ -86,7 +84,6 @@ def run_forensic_visual_audit(
         f"(p-value: {format_apa_p_value(p_val)})"
     )
 
-    # --- Audit of Panel E: Conformal Set Size Distribution ---
     unique_sizes, counts = np.unique(set_sizes, return_counts=True)
     audit_report.append("\n[Panel E] Prediction Set Size Distribution:")
     for sz, cnt in zip(unique_sizes, counts):
@@ -94,7 +91,6 @@ def run_forensic_visual_audit(
             f"  - Set Size {sz}: {cnt:4d} patients ({cnt / len(set_sizes):.1%})"
         )
 
-    # --- Audit of Panel F: Uncertainty by Error Profile ---
     mae = np.abs(test_preds - test_labels).mean(axis=1)
     median_mae = np.median(mae)
     low_error_unc = test_epistemic[mae <= median_mae]
@@ -107,7 +103,6 @@ def run_forensic_visual_audit(
         f"  - High Error Cohort Mean Uncertainty: {high_error_unc.mean():.6f}"
     )
 
-    # --- Audit of Panel I: Selective Classification (Abstention) ---
     rejection_order = np.argsort(test_epistemic)[::-1]
     rejection_rates = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5]
     audit_report.append(
@@ -181,7 +176,6 @@ def main() -> None:
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
 
-    # PHASE 2 — EVALUATION SETUP
     _, _, eval_val_loader, eval_test_loader, _ = get_dataloaders()
 
     pro_model = CXR_Synapse_Foundation(num_classes=14).to(DEVICE)
@@ -200,8 +194,6 @@ def main() -> None:
     pro_model.load_state_dict(clean_state, strict=False)
     pro_model.eval()
 
-    # PHASE 3 — METRICS & CONFORMAL CALIBRATION
-    # 1. Uncalibrated validation evaluation
     val_ensemble_evaluator = DeepEnsembleMCDropoutEvaluator(
         model_class=CXR_Synapse_Foundation,
         checkpoint_paths=ensemble_checkpoints,
@@ -218,19 +210,12 @@ def main() -> None:
     val_uncertainties  = val_ensemble_results["epistemic_variance"]
     val_labels = val_ensemble_results["labels"]
     
-    # Extract baseline validation class-specific performance for conformal weighting
     _, _, _, _, _, val_class_aucs = validate(
         pro_model, eval_val_loader, DEVICE, priors=priors_clipped
     )
     
-    # --------------------------------------------------------------------------
-    # SOTA DECOUPLED PIPELINE CALIBRATION
-    # --------------------------------------------------------------------------
-    # A) Optimize decision thresholds on UNCALIBRATED validation probabilities 
-    # to maximize Macro-F1 (prevents probability compression artifacts of rare classes)
     opt_thresholds = optimise_thresholds(raw_val_probs_ens, val_labels)
     
-    # Log optimized decision thresholds nicely
     thr_report = "\n".join(
         f"  - {ch:<18}: {t:.4f}" for ch, t in zip(CHESTMNIST_CLASS_NAMES, opt_thresholds)
     )
@@ -238,12 +223,10 @@ def main() -> None:
         "calibration", "Optimized Uncalibrated Class Decision Thresholds (F1-Maximized)", thr_report
     )
 
-    # B) Calibrate probabilities via Class-Wise Asymmetric Isotonic Regression (AIR)
     print("[*] Calibrating probabilities via Class-Wise Asymmetric Isotonic Regression (AIR)...")
     air_calibrator = ClassWiseAsymmetricIsotonicCalibrator(num_classes=14)
     air_calibrator.fit(raw_val_probs_ens, val_labels)
     
-    # Calibrate validation set probabilities strictly for Conformal Risk Control & ECE
     val_probs = air_calibrator.calibrate(raw_val_probs_ens)
     log_process(
         "calibration",
@@ -252,18 +235,13 @@ def main() -> None:
         cal_ece=f"{expected_calibration_error(val_probs, val_labels).mean():.4f}"
     )
 
-    # C) Optimize thresholds on CALIBRATED validation probabilities strictly as a baseline for Conformal Risk Control (CRC) scaling
     cal_opt_thresholds = optimise_thresholds(val_probs, val_labels)
 
-    # 3. Calibrated single-model baseline test evaluation
     _, _, _, raw_base_preds, base_labels, _ = validate(
         pro_model, eval_test_loader, DEVICE, priors=priors_clipped
     )
-    # Apply Isotonic Calibration to single-model baseline
     base_preds = air_calibrator.calibrate(raw_base_preds)
 
-    # 4. Calibrated Ensemble Test Evaluation (AIR-calibrated & Jensen-safe)
-    # Pass UNCALIBRATED thresholds to DeepEnsembleMCDropoutEvaluator to evaluate metrics under uncalibrated logits
     raw_ensemble_results = DeepEnsembleMCDropoutEvaluator(
         model_class=CXR_Synapse_Foundation,
         checkpoint_paths=ensemble_checkpoints,
@@ -277,12 +255,8 @@ def main() -> None:
     test_labels = raw_ensemble_results["labels"]
     test_epistemic = raw_ensemble_results["epistemic_variance"]
     
-    # Apply Isotonic Calibration to test-set probabilities before final metric and conformal calculations
     test_preds = air_calibrator.calibrate(raw_test_preds)
 
-    # --------------------------------------------------------
-    # AUTOMATED STATISTICAL ASSUMPTION CHECKING
-    # --------------------------------------------------------
     stat_report = []
     stat_report.append("Verifying statistical assumptions for paired hypotheses testing...")
     residuals = test_preds.flatten() - base_preds.flatten()
@@ -328,7 +302,6 @@ def main() -> None:
         "stats", "Statistical Validation & Assumptions", "\n".join(stat_report)
     )
 
-    # 5. Calibrate the Gated Conformal Predictor with Class-Specific Alphas
     conformal_predictor = UncertaintyGatedAdaptiveConformalPredictor(
         rejection_quantile=0.10
     )
@@ -343,7 +316,6 @@ def main() -> None:
     
     true_positives = test_labels.astype(bool)
     
-    # Calculate patient-level clinical coverage
     sick_mask = true_positives[accepted_mask].sum(axis=1) > 0
     covered_patients = (
         (
@@ -354,14 +326,12 @@ def main() -> None:
     )
     clinical_coverage = covered_patients.sum() / max(sick_mask.sum(), 1)
     
-    # Calculate strict class-averaged coverage
     per_class_cover = (conformal_sets[accepted_mask] & true_positives[accepted_mask]).sum(
         axis=0
     ) / np.maximum(true_positives[accepted_mask].sum(axis=0), 1)
     marginal_coverage = per_class_cover.mean()
     mean_set_size = conformal_sets[accepted_mask].sum(axis=1).mean()
 
-    # PHASE 4 — PUBLICATION FIGURES
     log_process("main", "generating_publication_figures", directory=FIGURE_DIR)
     plot_diagnostic_suite(
         test_labels=test_labels,
@@ -381,7 +351,6 @@ def main() -> None:
         output_dir=FIGURE_DIR,
     )
 
-    # Semantic manifolds collection
     feature_batches = []
     with torch.no_grad():
         for feats, _ in eval_test_loader:
@@ -398,7 +367,6 @@ def main() -> None:
         output_dir=FIGURE_DIR,
     )
 
-    # PHASE 5 — FORENSIC REPORTING
     run_forensic_visual_audit(
         test_labels=test_labels,
         test_preds=test_preds,
@@ -414,7 +382,6 @@ def main() -> None:
     )
     log_clinical_report("eval", "Epistemic Uncertainty ASCII Distribution", ascii_hist)
 
-    # Compute ECE using fully calibrated predictions
     cal_ece = expected_calibration_error(test_preds, test_labels)
 
     summary_df = pd.DataFrame(
@@ -433,8 +400,8 @@ def main() -> None:
                 f"{_safe_macro_auc(test_labels, test_preds):.4f}",
                 f"[{ens_ci['ci_low']:.4f}, {ens_ci['ci_high']:.4f}]",
                 f"{format_apa_p_value(sig['p_value'])}",
-                f"{raw_ensemble_results['f1']:.4f}",  # Reports decoupled F1 score optimized on uncalibrated space (>= 0.20)
-                f"{cal_ece.mean():.4f}",             # Reports SOTA ECE achieved via AIR calibrator (~1.2%)
+                f"{raw_ensemble_results['f1']:.4f}",
+                f"{cal_ece.mean():.4f}",
                 f"{marginal_coverage:.1%}",
                 f"{clinical_coverage:.1%}",
                 f"{mean_set_size:.2f}",

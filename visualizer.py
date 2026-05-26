@@ -20,7 +20,6 @@ from sklearn.metrics import (
 )
 from sklearn.preprocessing import StandardScaler
 
-# GPU-Accelerated UMAP check (cuml) with graceful CPU fallback
 try:
     from cuml.manifold import UMAP as GPU_UMAP
     _HAS_CUML = True
@@ -29,7 +28,6 @@ except ImportError:
     from umap.utils import disconnected_vertices
     _HAS_CUML = False
 
-# Statsmodels check for safe lowess regression fallback
 try:
     import statsmodels.api as sm
     _HAS_STATSMODELS = True
@@ -282,7 +280,6 @@ def _draw_uncertainty_vs_set_size(ax: plt.Axes, data: _DiagnosticData) -> None:
     """Plots epistemic uncertainty versus conformal set size."""
     n = min(len(data.uncertainty), 1500)
     
-    # Dynamic dictionary expansion to avoid None comparison TypeError in Seaborn regplot
     reg_kwargs = {
         "x": data.uncertainty[:n],
         "y": data.set_sizes[:n],
@@ -951,7 +948,6 @@ def plot_semantic_manifold(embeddings: np.ndarray, labels: np.ndarray, class_nam
         has_disease = has_disease[valid_mask]
         primary_class = primary_class[valid_mask]
     else:
-        # GPU UMAP handles connectivity natively, preserve indexing
         valid_mask = np.ones(len(proj), dtype=bool)
     
     fig, ax = plt.subplots(figsize=(3.5, 3.5), layout="constrained")
@@ -1016,6 +1012,5 @@ def plot_paq_attention(image_array, attn_weights, pathology_name: str, experimen
     _save_figure(fig, out / f"paq_attention_{pathology_name.replace(' ', '_')}_{experiment_id}", fmt="png")
     configure_nature_style()
 
-# Clean up visualizer memory
 plt.close('all')
 gc.collect()

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 import gc
@@ -214,11 +213,9 @@ class ForensicDatasetAuditor:
         rng = np.random.RandomState(42)
         sample_idx = rng.choice(self.n_samples, min(1000, self.n_samples), replace=False)
         
-        # cuCIM-Accelerated Edge Density computation on the GPU
         edge_density_accum = cp.zeros((self.h, self.w), dtype=cp.float32)
         
         for chunk in self._chunked_image_generator(indices=sample_idx):
-            # Wrap PyTorch CUDA tensor as a zero-copy CuPy array
             chunk_cupy = cp.asnumpy(chunk.cpu().numpy()) if self.device.type == "cpu" else cp.asarray(chunk)
             for i in range(chunk_cupy.shape[0]):
                 edge_density_accum += cur_filters.sobel(chunk_cupy[i])

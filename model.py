@@ -25,33 +25,27 @@ def apply_2d_rope(x: torch.Tensor, grid_size: int = 8) -> torch.Tensor:
     batch_size, num_patches, feat_dim = x.shape
     device = x.device
     
-    # კუთხური სიხშირეების გენერირება
     dim_half = feat_dim // 2
     inv_freq = 1.0 / (10000.0 ** (torch.arange(0, dim_half, 2, dtype=torch.float32, device=device) / dim_half))
     
-    # 2D ბადის კოორდინატების აგება
     t = torch.arange(grid_size, dtype=torch.float32, device=device)
     grid_y, grid_x = torch.meshgrid(t, t, indexing="ij")
     grid_y, grid_x = grid_y.reshape(-1), grid_x.reshape(-1) # Shape: (64,)
     
-    # ფაზების გამოთვლა x და y კოორდინატებისთვის
     freqs_x = torch.outer(grid_x, inv_freq) # (64, dim_half/2)
     freqs_y = torch.outer(grid_y, inv_freq) # (64, dim_half/2)
     
-    # სინუსურ-კოსინუსური მატრიცების გაერთიანება
     freqs = torch.cat([freqs_x, freqs_y], dim=-1) # (64, dim_half)
     emb = torch.cat([freqs, freqs], dim=-1) # (64, feat_dim)
     
     cos = emb.cos().unsqueeze(0) # (1, 64, feat_dim)
     sin = emb.sin().unsqueeze(0) # (1, 64, feat_dim)
     
-    # როტაციული მატრიცის ტრიუკი (Rotary embedding transformation)
     def rotate_half(tensor):
         t1 = tensor[..., :tensor.shape[-1] // 2]
         t2 = tensor[..., tensor.shape[-1] // 2:]
         return torch.cat((-t2, t1), dim=-1)
 
-    # როტაციული ბრუნვის გამოყენება
     x_rotated = (x * cos) + (rotate_half(x) * sin)
     return x_rotated
 
@@ -139,13 +133,10 @@ class PathologyCrossAttention(nn.Module):
         )
         queries = self.norm_self(fused_queries + self_out)
         
-        # 1. 2D RoPE-ის გამოყენება სივრცით პატჩებზე (კროს-ყურადღებამდე)
-        # ეს მათემატიკურად სუფთად ახდენს სივრცითი კოორდინატების პროექციას
         rotated_patches = apply_2d_rope(patches, grid_size=8)
         
         attn_out, _ = self.cross_attn(query=queries, key=rotated_patches, value=rotated_patches)
         
-        # რეზიდუალური კავშირი კროს-ყურადღების შემდგომ
         hidden_cross = self.norm_cross(queries + attn_out)
         
         disease_features = self.norm_ffn(hidden_cross + self.ffn(hidden_cross))
@@ -183,7 +174,6 @@ class CXR_Synapse_Foundation(nn.Module):
             nn.GELU(),
         )
         
-        # ძველი ადიტიური pos_embed მთლიანად ამოღებულია არქიტექტურიდან
         self.pathology_router = PathologyCrossAttention(num_classes, 768, feat_dim)
         
         self.register_buffer("radlex_emb", torch.zeros(num_classes, 768))
@@ -205,7 +195,6 @@ class CXR_Synapse_Foundation(nn.Module):
         patches = x.reshape(batch_size, h_spatial * w_spatial, channels)
         proj = self.dim_reduction(patches)
         
-        # 2D RoPE ავტომატურად შესრულდება PathologyCrossAttention მოდულის შიგნით
         z_v, _ = self.pathology_router(proj, self.radlex_emb, self.adjacency_mask)
         return z_v
 

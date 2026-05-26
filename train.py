@@ -83,7 +83,6 @@ class ClassBalancedAsymmetricLoss(nn.Module):
 
         loss = loss_pos + loss_neg
         
-        # კლასობრივი წონების ვექტორიზებული გამოყენება
         if self.class_weights is not None:
             loss = loss * self.class_weights.unsqueeze(0)
 
@@ -125,7 +124,6 @@ def train_single_model(
     priors = np.clip(priors, 1e-4, 1.0 - 1e-4)
     model.set_priors(priors)
 
-    # კლასობრივად ბალანსირებული წონების (ENS, beta = 0.9999) გამოთვლა
     beta = 0.9999
     class_counts = np.clip(np.sum(train_labels_np, axis=0), 1.0, None)
     ens = (1.0 - np.power(beta, class_counts)) / (1.0 - beta)
@@ -133,7 +131,6 @@ def train_single_model(
     normalized_weights = raw_weights / np.mean(raw_weights)
     class_weights_tensor = torch.from_numpy(normalized_weights).to(DEVICE)
 
-    # ლოკალურად ინიციალიზებული CB-ASL დანაკარგის ფუნქცია
     loss_fn = ClassBalancedAsymmetricLoss(
         gamma_neg=4.0, 
         gamma_pos=1.0, 

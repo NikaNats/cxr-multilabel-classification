@@ -13,10 +13,6 @@ from torchvision import transforms
 
 from config import DATALOADER_GENERATOR, log_process
 
-# ==============================================================================
-# § 1  GLOBAL DATA CONFIGURATION
-# ==============================================================================
-
 IMAGE_SIZE: int = 224
 BATCH_SIZE: int = 64
 
@@ -75,7 +71,6 @@ def get_raw_datasets() -> tuple[ChestMNIST, ChestMNIST, ChestMNIST, list[str]]:
     raw_val_hashes = _img_hashes_parallel(val_dataset_raw.imgs)
     raw_test_hashes = _img_hashes_parallel(test_dataset_raw.imgs)
 
-    # Filter Validation split for Train overlaps
     val_keep = np.array([h not in train_hash_set for h in raw_val_hashes])
     n_val_rm = int((~val_keep).sum())
     if n_val_rm:
@@ -84,7 +79,6 @@ def get_raw_datasets() -> tuple[ChestMNIST, ChestMNIST, ChestMNIST, list[str]]:
         val_dataset_raw.info["n_samples"]["val"] = int(val_keep.sum())
         print(f"  Removed {n_val_rm} duplicate(s) from Val.")
 
-    # Filter Test split for Train/Val overlaps
     val_hash_clean = {h for h, k in zip(raw_val_hashes, val_keep) if k}
     combined_ref = train_hash_set | val_hash_clean
     test_keep = np.array([h not in combined_ref for h in raw_test_hashes])
@@ -169,8 +163,6 @@ class EmbeddingDataset(Dataset):
         return self.n
 
     def __getitem__(self, i: int) -> tuple[torch.Tensor, torch.Tensor]:
-        # Jittering has been removed from CPU space. 
-        # It is now applied to the batch tensor on the GPU in the training loop.
         return self.features[i], self.labels[i]
 
 

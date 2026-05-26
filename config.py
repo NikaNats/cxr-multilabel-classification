@@ -20,13 +20,10 @@ import torch
 GLOBAL_SEED: int = 42
 EXPERIMENT_NAME: str = "CXR_Synapse_Foundation_ChestMNIST"
 
-# Path configuration
 OUTPUT_DIR: Path = Path("runs") if hasattr(sys, "frozen") else Path("./runs")
 LOG_DIR: Path = OUTPUT_DIR / "logs"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
-# Unique Run Fingerprint: Generates an immutable, traceable 12-char SHA-256 hash.
-# Combines name, seed, hardware specs, and timestamp to prevent run collisions.
 _PROVENANCE_STR: str = (
     f"{EXPERIMENT_NAME}_{GLOBAL_SEED}_"
     f"{platform.processor()}_"
@@ -128,7 +125,6 @@ def format_ascii_matrix(
     n = matrix.shape[0]
     short_labels = [lbl[:8] for lbl in labels]
     
-    # Header row
     col_headers = " " * 10 + " | ".join(f"{lbl:>8}" for lbl in short_labels)
     output = [
         f"=== ASCII HEATMAP: {title.upper()} ===",
