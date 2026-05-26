@@ -1,21 +1,19 @@
 from __future__ import annotations
 
+import cucim.skimage.filters as cur_filters
+import cupy as cp
 import gc
 import hashlib
-import warnings
-from typing import Any, Generator
-
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
 import torch
-import torch.nn.functional as F
-
-import cupy as cp
-import cucim.skimage.filters as cur_filters
+import warnings
 from scipy.stats import chi2_contingency, entropy, ks_2samp, mannwhitneyu
 from sklearn.metrics import matthews_corrcoef, mutual_info_score
+from typing import Any, Generator
+
 
 # ==============================================================================
 # § 1  STYLE CONSTANTS & NATURE CONFIGURATION
@@ -23,14 +21,15 @@ from sklearn.metrics import matthews_corrcoef, mutual_info_score
 
 class Colour:
     """Wong (2011) color-blind-safe hexadecimal codes."""
-    BLUE   = "#0072B2"
+    BLUE = "#0072B2"
     ORANGE = "#D55E00"
-    GREEN  = "#009E73"
-    SKY    = "#56B4E9"
+    GREEN = "#009E73"
+    SKY = "#56B4E9"
     PURPLE = "#CC79A7"
     YELLOW = "#F0E442"
-    BLACK  = "#000000"
-    GREY   = "#999999"
+    BLACK = "#000000"
+    GREY = "#999999"
+
 
 COLOUR_CYCLE = [
     Colour.BLUE, Colour.ORANGE, Colour.GREEN,
@@ -77,9 +76,11 @@ _NATURE_RCPARAMS = {
     "savefig.bbox": "tight",
 }
 
+
 def configure_nature_style() -> None:
     plt.rcParams.update(_NATURE_RCPARAMS)
     sns.set_theme(style="white", palette=COLOUR_CYCLE, rc=_NATURE_RCPARAMS)
+
 
 try:
     from IPython.display import display
@@ -103,11 +104,11 @@ class ForensicDatasetAuditor:
     ]
 
     def __init__(
-        self, 
-        dataset: Any, 
-        split_name: str = "Train", 
-        n_bins_mi: int = 50, 
-        chunk_size: int = 2000
+            self,
+            dataset: Any,
+            split_name: str = "Train",
+            n_bins_mi: int = 50,
+            chunk_size: int = 2000
     ):
         self.dataset = dataset
         self.split_name = split_name
@@ -131,11 +132,11 @@ class ForensicDatasetAuditor:
         self.results: dict[str, Any] = {}
 
     def _chunked_image_generator(
-        self, indices: np.ndarray | list[int] | None = None
+            self, indices: np.ndarray | list[int] | None = None
     ) -> Generator[torch.Tensor, None, None]:
         target_indices = np.arange(self.n_samples) if indices is None else np.array(indices)
         for i in range(0, len(target_indices), self.chunk_size):
-            batch_idx = target_indices[i : i + self.chunk_size]
+            batch_idx = target_indices[i: i + self.chunk_size]
             chunk = torch.from_numpy(self.dataset.imgs[batch_idx]).to(self.device, dtype=torch.float32) / 255.0
             yield chunk
 
@@ -212,9 +213,9 @@ class ForensicDatasetAuditor:
 
         rng = np.random.RandomState(42)
         sample_idx = rng.choice(self.n_samples, min(1000, self.n_samples), replace=False)
-        
+
         edge_density_accum = cp.zeros((self.h, self.w), dtype=cp.float32)
-        
+
         for chunk in self._chunked_image_generator(indices=sample_idx):
             chunk_cupy = cp.asnumpy(chunk.cpu().numpy()) if self.device.type == "cpu" else cp.asarray(chunk)
             for i in range(chunk_cupy.shape[0]):
@@ -261,7 +262,7 @@ class ForensicDatasetAuditor:
     def audit_safety_integrity(self) -> None:
         print("[*] Auditing Safety & Integrity...")
         image_entropies = np.zeros(self.n_samples)
-        
+
         idx = 0
         with torch.no_grad():
             for chunk in self._chunked_image_generator():
@@ -332,21 +333,21 @@ class ForensicDatasetAuditor:
                 for j in range(grid_size):
                     y0, y1 = i * ph, (i + 1) * ph
                     x0, x1 = j * pw, (j + 1) * pw
-                    
+
                     patch_means_list = []
                     patch_stds_list = []
-                    
+
                     for chunk in self._chunked_image_generator():
                         patches = chunk[:, y0:y1, x0:x1]
                         patch_means_list.append(torch.mean(patches, dim=(1, 2)).cpu().numpy())
                         patch_stds_list.append(torch.std(patches, dim=(1, 2)).cpu().numpy())
-                    
+
                     patch_means = np.concatenate(patch_means_list)
                     patch_stds = np.concatenate(patch_stds_list)
-                    
+
                     patch_feat = np.round(patch_means * 50).astype(int) * 100 + np.round(patch_stds * 50).astype(int)
                     patch_mi = [mutual_info_score(self.labels[:, c], patch_feat) for c in range(self.n_classes)]
-                    
+
                     quadrant_info[f"Q_{i}{j}"] = {
                         'mi': patch_mi, 'mean_intensity': float(np.mean(patch_means)),
                         'std_intensity': float(np.std(patch_means)),
@@ -417,7 +418,8 @@ class ForensicDatasetAuditor:
 
     def generate_report(self) -> None:
         configure_nature_style()
-        print(f"\n{'=' * 65}\n  FORENSIC DATASET AUDIT — {self.split_name} Split\n  n = {self.n_samples:,} | {self.n_classes} classes | {self.h}x{self.w} px\n{'=' * 65}")
+        print(
+            f"\n{'=' * 65}\n  FORENSIC DATASET AUDIT — {self.split_name} Split\n  n = {self.n_samples:,} | {self.n_classes} classes | {self.h}x{self.w} px\n{'=' * 65}")
 
         self.audit_information_theory()
         self.audit_spatial_morphology()
@@ -455,7 +457,8 @@ class ForensicDatasetAuditor:
             short_names = [n[:12] for n in self.class_names]
 
             # A. Conditional Prevalence
-            sns.heatmap(self.results['cond_prev'], ax=ax['A'], annot=True, annot_kws={"size": 4}, fmt='.2f', cmap='mako',
+            sns.heatmap(self.results['cond_prev'], ax=ax['A'], annot=True, annot_kws={"size": 4}, fmt='.2f',
+                        cmap='mako',
                         xticklabels=short_names, yticklabels=short_names, linewidths=0.3, linecolor='white', cbar=False)
             ax['A'].set_title("a. Conditional Prevalence P(Row | Col)")
 
@@ -466,14 +469,16 @@ class ForensicDatasetAuditor:
             plt.colorbar(im_b, ax=ax['B'], fraction=0.046, pad=0.04)
 
             # C. SNR Distribution
-            sns.histplot(self.results['snr_dist'], ax=ax['C'], bins=40, kde=True, color=Colour.BLUE, alpha=0.7, edgecolor="white", linewidth=0.3)
+            sns.histplot(self.results['snr_dist'], ax=ax['C'], bins=40, kde=True, color=Colour.BLUE, alpha=0.7,
+                         edgecolor="white", linewidth=0.3)
             ax['C'].set_title("c. Signal-to-Noise Ratio (SNR)")
             ax['C'].set_xlabel("SNR (score)")
             ax['C'].set_ylabel("Frequency (count)")
 
             # D. Phi Coefficient
             mask = np.triu(np.ones_like(self.results['phi'], dtype=bool))
-            sns.heatmap(self.results['phi'], ax=ax['D'], annot=True, annot_kws={"size": 4}, fmt='.2f', cmap='RdBu_r', center=0, mask=mask,
+            sns.heatmap(self.results['phi'], ax=ax['D'], annot=True, annot_kws={"size": 4}, fmt='.2f', cmap='RdBu_r',
+                        center=0, mask=mask,
                         xticklabels=short_names, yticklabels=short_names, linewidths=0.3, cbar=False)
             ax['D'].set_title("d. Phi Coefficient (Correlation)")
 
@@ -512,7 +517,8 @@ class ForensicDatasetAuditor:
             ax['H'].legend(fontsize=4, ncol=2, loc="upper right")
 
             # I. Cardinality
-            sns.histplot(self.results['cardinality'], ax=ax['I'], discrete=True, color=Colour.GREEN, edgecolor="white", linewidth=0.3)
+            sns.histplot(self.results['cardinality'], ax=ax['I'], discrete=True, color=Colour.GREEN, edgecolor="white",
+                         linewidth=0.3)
             ax['I'].set_title("i. Label Cardinality Distribution")
             ax['I'].set_xlabel("Pathologies (count)")
             ax['I'].set_ylabel("Frequency (count)")
@@ -521,13 +527,14 @@ class ForensicDatasetAuditor:
             mi_map = np.zeros((2, 2), dtype=np.float32)
             spatial_data = self.results.get('spatial_quadrants', {})
             if spatial_data:
-                for (r, c) in [(0, 0), (0, 1), (1, 0), (1, 1)]: 
+                for (r, c) in [(0, 0), (0, 1), (1, 0), (1, 1)]:
                     mi_map[r, c] = np.mean(spatial_data[f'Q_{r}{c}']['mi'])
             sns.heatmap(mi_map, ax=ax['J'], annot=True, fmt='.4f', cmap='YlOrRd', cbar=False, annot_kws={"size": 5})
             ax['J'].set_title("j. Spatial MI Map (2x2)")
 
             # K. Cramer's V
-            sns.heatmap(self.results['cramers_v'], ax=ax['K'], annot=True, annot_kws={"size": 4}, fmt='.3f', cmap='rocket_r',
+            sns.heatmap(self.results['cramers_v'], ax=ax['K'], annot=True, annot_kws={"size": 4}, fmt='.3f',
+                        cmap='rocket_r',
                         xticklabels=short_names, yticklabels=short_names, linewidths=0.3, cbar=False)
             ax['K'].set_title("k. Cramér's V (Association)")
 
@@ -572,7 +579,8 @@ def execute_forensic_audit(train_dataset: Any, val_dataset: Any, test_dataset: A
 
     total_leakage = sum(leakage.values()) + sum(leakage_vt.values())
     print(f"\n  {'=' * 50}")
-    print(f"  LEAKAGE VERDICT: {'[✓] CLEAN (Strictly Separated)' if total_leakage == 0 else f'[!] CONTAMINATED ({total_leakage} overlap nodes detected)'}")
+    print(
+        f"  LEAKAGE VERDICT: {'[✓] CLEAN (Strictly Separated)' if total_leakage == 0 else f'[!] CONTAMINATED ({total_leakage} overlap nodes detected)'}")
     print(f"  {'=' * 50}")
 
     del auditor_for_leakage, auditor_val_leakage

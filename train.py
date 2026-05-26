@@ -2,10 +2,8 @@ from __future__ import annotations
 
 import gc
 import math
-import random
-from typing import Any
-
 import numpy as np
+import random
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -13,6 +11,7 @@ from torch import optim
 from torch.optim.swa_utils import SWALR, AveragedModel, update_bn
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
+from typing import Any
 
 from config import log_process, DEVICE
 from evaluators import validate
@@ -39,13 +38,14 @@ class ClassBalancedAsymmetricLoss(nn.Module):
     Numerically stable Class-Balanced Asymmetric Loss (CB-ASL).
     Dynamically scales loss gradients using inverse Effective Number of Samples (ENS).
     """
+
     def __init__(
-        self,
-        gamma_neg: float = 4.0,
-        gamma_pos: float = 1.0,
-        clip: float = 0.05,
-        eps: float = 1e-8,
-        class_weights: torch.Tensor | None = None
+            self,
+            gamma_neg: float = 4.0,
+            gamma_pos: float = 1.0,
+            clip: float = 0.05,
+            eps: float = 1e-8,
+            class_weights: torch.Tensor | None = None
     ):
         super().__init__()
         self.gamma_neg = gamma_neg
@@ -82,7 +82,7 @@ class ClassBalancedAsymmetricLoss(nn.Module):
                 loss_neg *= factors_neg
 
         loss = loss_pos + loss_neg
-        
+
         if self.class_weights is not None:
             loss = loss * self.class_weights.unsqueeze(0)
 
@@ -94,12 +94,12 @@ class ClassBalancedAsymmetricLoss(nn.Module):
 # ==============================================================================
 
 def train_single_model(
-    seed: int,
-    adj_norm_np: np.ndarray,
-    train_emb_dataset: Any,
-    train_loader: DataLoader,
-    val_loader: DataLoader,
-    num_workers: int,
+        seed: int,
+        adj_norm_np: np.ndarray,
+        train_emb_dataset: Any,
+        train_loader: DataLoader,
+        val_loader: DataLoader,
+        num_workers: int,
 ) -> str:
     """Trains a single instance of the foundation network under a specified random seed."""
     torch.manual_seed(seed)
@@ -132,8 +132,8 @@ def train_single_model(
     class_weights_tensor = torch.from_numpy(normalized_weights).to(DEVICE)
 
     loss_fn = ClassBalancedAsymmetricLoss(
-        gamma_neg=4.0, 
-        gamma_pos=1.0, 
+        gamma_neg=4.0,
+        gamma_pos=1.0,
         clip=0.05,
         class_weights=class_weights_tensor
     ).to(DEVICE)
@@ -191,7 +191,7 @@ def train_single_model(
         for feats, lbls in pbar:
             feats = feats.to(DEVICE, non_blocking=True)
             lbls = lbls.to(DEVICE, non_blocking=True).float()
-            
+
             if train_emb_dataset.split == "train" and train_emb_dataset.jitter_eps > 0:
                 noise = torch.randn_like(feats) * train_emb_dataset.jitter_eps
                 feats = feats + noise
@@ -269,12 +269,12 @@ def train_single_model(
 
 
 def train_ensemble(
-    seeds: list[int] | np.ndarray,
-    adj_norm_np: np.ndarray,
-    train_emb_dataset: Any,
-    train_loader: DataLoader,
-    val_loader: DataLoader,
-    num_workers: int,
+        seeds: list[int] | np.ndarray,
+        adj_norm_np: np.ndarray,
+        train_emb_dataset: Any,
+        train_loader: DataLoader,
+        val_loader: DataLoader,
+        num_workers: int,
 ) -> list[str]:
     ensemble_checkpoints = []
     for seed in seeds:

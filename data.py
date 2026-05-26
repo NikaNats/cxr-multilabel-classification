@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import os
 import multiprocessing
-from concurrent.futures import ProcessPoolExecutor
 import numpy as np
+import os
 import torch
+from concurrent.futures import ProcessPoolExecutor
 from medmnist import ChestMNIST
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
@@ -41,7 +41,7 @@ def _img_hashes_parallel(arr: np.ndarray) -> list[str]:
     """
     num_workers = min(multiprocessing.cpu_count(), 8)
     chunks = np.array_split(arr, num_workers)
-    
+
     hashes = []
     with ProcessPoolExecutor(max_workers=num_workers) as executor:
         results = executor.map(_hash_chunk, chunks)
@@ -115,7 +115,7 @@ class EmbeddingDataset(Dataset):
     """
 
     def __init__(
-        self, path: str | os.PathLike, split: str = "train", jitter_eps: float = 0.015
+            self, path: str | os.PathLike, split: str = "train", jitter_eps: float = 0.015
     ):
         if not os.path.exists(path):
             raise FileNotFoundError(
@@ -168,7 +168,7 @@ class EmbeddingDataset(Dataset):
 
 def seed_worker(worker_id: int) -> None:
     import random
-    w = torch.initial_seed() % 2**32
+    w = torch.initial_seed() % 2 ** 32
     np.random.seed(w)
     random.seed(w)
 

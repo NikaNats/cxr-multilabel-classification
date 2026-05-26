@@ -3,15 +3,14 @@ from __future__ import annotations
 import datetime
 import hashlib
 import logging
+import numpy as np
 import os
 import platform
 import random
 import sys
+import torch
 from pathlib import Path
 from typing import Any
-
-import numpy as np
-import torch
 
 # ==============================================================================
 # § 1  EXPERIMENT PROVENANCE & IDENTIFICATION
@@ -31,22 +30,23 @@ _PROVENANCE_STR: str = (
 )
 EXPERIMENT_ID: str = hashlib.sha256(_PROVENANCE_STR.encode()).hexdigest()[:12]
 
+
 # ==============================================================================
 # § 2  OBSERVABILITY, TELEMETRY & RICH LOGGING FORMATTERS
 # ==============================================================================
 
 def _configure_structured_logger(
-    name: str = "cxr_synapse", level: int | str | None = None
+        name: str = "cxr_synapse", level: int | str | None = None
 ) -> logging.Logger:
     """
     Creates a process-wide logger with a dual-handler setup (Stream + File).
     All logs are timestamped with ISO-8601 formatting for clinical audatability.
     """
     logger = logging.getLogger(name)
-    
+
     level_name = (level or os.getenv("CXR_LOG_LEVEL", "INFO")).upper()
     level_value = getattr(logging, level_name, logging.INFO)
-    
+
     if logger.handlers:
         logger.setLevel(level_value)
         for handler in logger.handlers:
@@ -58,7 +58,7 @@ def _configure_structured_logger(
 
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(level_value)
-    
+
     formatter = logging.Formatter(
         "%(asctime)s | %(levelname)s | %(message)s", "%Y-%m-%d %H:%M:%S"
     )
@@ -87,7 +87,7 @@ def log_process(stage: str, event: str, level: int = logging.INFO, **details: An
 
 
 def log_clinical_report(
-    stage: str, report_title: str, content: str, level: int = logging.INFO
+        stage: str, report_title: str, content: str, level: int = logging.INFO
 ) -> None:
     """
     Prints a highly structured, clinical-grade multi-line report block into the logs.
@@ -96,7 +96,7 @@ def log_clinical_report(
     border = "═" * 78
     header = f"║  {report_title.upper()} — RUN: {EXPERIMENT_ID}"
     padding = " " * (78 - len(header) - 1)
-    
+
     formatted_report = (
         f"\n{border}\n"
         f"{header}{padding}║\n"
@@ -105,7 +105,7 @@ def log_clinical_report(
     for line in content.strip().split("\n"):
         formatted_report += f"║ {line:<75} ║\n"
     formatted_report += f"{border}\n"
-    
+
     LOGGER.log(
         level, "[%s] Clinical Report Generated:\n%s", stage.upper(), formatted_report
     )
@@ -116,7 +116,7 @@ def log_clinical_report(
 # ==============================================================================
 
 def format_ascii_matrix(
-    matrix: np.ndarray, labels: list[str], title: str = "MATRIX"
+        matrix: np.ndarray, labels: list[str], title: str = "MATRIX"
 ) -> str:
     """
     Translates a 2D matrix (e.g., Correlation, Cramer's V) into a perfectly aligned
@@ -124,14 +124,14 @@ def format_ascii_matrix(
     """
     n = matrix.shape[0]
     short_labels = [lbl[:8] for lbl in labels]
-    
+
     col_headers = " " * 10 + " | ".join(f"{lbl:>8}" for lbl in short_labels)
     output = [
         f"=== ASCII HEATMAP: {title.upper()} ===",
         col_headers,
         "-" * len(col_headers),
     ]
-    
+
     for i in range(n):
         row_str = f"{short_labels[i]:<8} | "
         cells = []
@@ -148,7 +148,7 @@ def format_ascii_matrix(
 
 
 def format_ascii_histogram(
-    data: np.ndarray, bins: int = 10, width: int = 30, title: str = "DISTRIBUTION"
+        data: np.ndarray, bins: int = 10, width: int = 30, title: str = "DISTRIBUTION"
 ) -> str:
     """
     Generates a text-based ASCII histogram of continuous data (e.g., SNR, Entropies)
@@ -157,10 +157,10 @@ def format_ascii_histogram(
     valid_data = data[np.isfinite(data)]
     if len(valid_data) == 0:
         return f"=== ASCII HISTOGRAM: {title.upper()} ===\nNo valid data to plot."
-        
+
     counts, edges = np.histogram(valid_data, bins=bins)
     max_count = max(counts) if max(counts) > 0 else 1
-    
+
     output = [f"=== ASCII HISTOGRAM: {title.upper()} ==="]
     for i in range(bins):
         bar = "█" * int((counts[i] / max_count) * width)
@@ -188,15 +188,15 @@ def get_hardware_telemetry() -> dict[str, Any]:
         "pytorch_version": torch.__version__,
         "cuda_available": torch.cuda.is_available(),
     }
-    
+
     if telemetry["cuda_available"]:
         device_id = torch.cuda.current_device()
         device_name = torch.cuda.get_device_name(device_id)
         capability = torch.cuda.get_device_capability(device_id)
         total_memory = (
-            torch.cuda.get_device_properties(device_id).total_memory / (1024**3)
+                torch.cuda.get_device_properties(device_id).total_memory / (1024 ** 3)
         )
-        
+
         telemetry.update(
             {
                 "device_name": device_name,
@@ -213,7 +213,7 @@ def get_hardware_telemetry() -> dict[str, Any]:
             telemetry["tf32_enabled"] = False
     else:
         telemetry["device_name"] = "CPU"
-        
+
     return telemetry
 
 
@@ -232,7 +232,7 @@ def enforce_reproducibility(seed: int = GLOBAL_SEED) -> torch.Generator:
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
-    
+
     if torch.cuda.is_available():
         torch.cuda.manual_seed(seed)
         torch.cuda.manual_seed_all(seed)

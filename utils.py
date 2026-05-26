@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-import os
-import warnings
-from typing import Callable
-
 import numpy as np
+import os
 import torch
 import torch.nn.functional as F
+import warnings
 from scipy.ndimage import uniform_filter1d
 from sklearn.exceptions import UndefinedMetricWarning
 from sklearn.isotonic import IsotonicRegression
+from typing import Callable
 
 from config import log_process
 
@@ -41,10 +40,10 @@ def format_apa_correlation(r: float) -> str:
 
 
 def ensure_radlex_embeddings(
-    path: str | os.PathLike, 
-    pathologies: list[str], 
-    model_name: str, 
-    device: torch.device
+        path: str | os.PathLike,
+        pathologies: list[str],
+        model_name: str,
+        device: torch.device
 ) -> torch.Tensor:
     from transformers import AutoModel, AutoTokenizer
     target_dim = 768
@@ -96,12 +95,12 @@ def select_adjacency_threshold(labels: np.ndarray, num_classes: int = 14) -> flo
 
 
 def build_hybrid_clinical_adjacency(
-    labels: np.ndarray,
-    radlex_emb: torch.Tensor,
-    num_classes: int = 14,
-    threshold: float = 0.05,
-    self_loops: bool = True,
-    alpha_blend: float = 0.7
+        labels: np.ndarray,
+        radlex_emb: torch.Tensor,
+        num_classes: int = 14,
+        threshold: float = 0.05,
+        self_loops: bool = True,
+        alpha_blend: float = 0.7
 ) -> np.ndarray:
     co = np.zeros((num_classes, num_classes), dtype=np.float64)
     for row in labels:
@@ -109,17 +108,17 @@ def build_hybrid_clinical_adjacency(
         for i in idx:
             for j in idx:
                 co[i, j] += 1.0
-                
+
     prob_emp = co / np.maximum(co.sum(1, keepdims=True), 1.0)
-    
+
     with torch.no_grad():
         norm_emb = F.normalize(radlex_emb, p=2, dim=-1)
         sem_sim = torch.matmul(norm_emb, norm_emb.t()).cpu().numpy().astype(np.float64)
-    
+
     hybrid_prob = alpha_blend * prob_emp + (1.0 - alpha_blend) * sem_sim
-    
+
     hybrid_prob_sym = (hybrid_prob + hybrid_prob.T) / 2.0
-    
+
     adj = (hybrid_prob_sym >= threshold).astype(np.float64) * hybrid_prob_sym
     if self_loops:
         adj += np.eye(num_classes)
@@ -141,7 +140,7 @@ def expected_calibration_error(probs: np.ndarray, labels: np.ndarray, n_bins: in
                 m = (probs[:, k] >= lo) & (probs[:, k] <= hi)
             else:
                 m = (probs[:, k] >= lo) & (probs[:, k] < hi)
-                
+
             if m.sum() > 0:
                 ek += m.mean() * abs(labels[m, k].mean() - probs[m, k].mean())
         ece.append(ek)
@@ -149,12 +148,12 @@ def expected_calibration_error(probs: np.ndarray, labels: np.ndarray, n_bins: in
 
 
 def bootstrap_metric_ci(
-    fn: Callable[[np.ndarray, np.ndarray], float],
-    y_true: np.ndarray,
-    y_score: np.ndarray,
-    n: int = 2000,
-    alpha: float = 0.05,
-    seed: int = 42
+        fn: Callable[[np.ndarray, np.ndarray], float],
+        y_true: np.ndarray,
+        y_score: np.ndarray,
+        n: int = 2000,
+        alpha: float = 0.05,
+        seed: int = 42
 ) -> dict[str, float]:
     rng = np.random.RandomState(seed)
     N = y_true.shape[0]
@@ -178,12 +177,12 @@ def bootstrap_metric_ci(
 
 
 def paired_bootstrap_metric_test(
-    fn: Callable[[np.ndarray, np.ndarray], float],
-    y_true: np.ndarray,
-    ya: np.ndarray,
-    yb: np.ndarray,
-    n: int = 2000,
-    seed: int = 42
+        fn: Callable[[np.ndarray, np.ndarray], float],
+        y_true: np.ndarray,
+        ya: np.ndarray,
+        yb: np.ndarray,
+        n: int = 2000,
+        seed: int = 42
 ) -> dict[str, float]:
     rng = np.random.RandomState(seed)
     N = y_true.shape[0]
@@ -208,33 +207,33 @@ def optimise_thresholds(probs: np.ndarray, labels: np.ndarray, grid_steps: int =
     """
     n_samples, n_cls = probs.shape
     thr = np.full(n_cls, 0.5)
-    
+
     for k in range(n_cls):
         y_true_bool = labels[:, k].astype(bool)
         total_pos = y_true_bool.sum()
         if total_pos == 0:
             continue
-        
+
         grid = np.unique(np.percentile(probs[:, k], np.linspace(10, 99.9, grid_steps)))
         grid = np.clip(grid, 0.00001, 0.99999)
-        
+
         preds = probs[:, k, np.newaxis] >= grid[np.newaxis, :]
-        
+
         tp = (preds & y_true_bool[:, np.newaxis]).sum(axis=0)
         fp = (preds & (~y_true_bool)[:, np.newaxis]).sum(axis=0)
         fn = ((~preds) & y_true_bool[:, np.newaxis]).sum(axis=0)
-        
+
         denominator = 2 * tp + fp + fn
         f1_scores = np.zeros_like(grid)
         valid_mask = denominator > 0
         f1_scores[valid_mask] = (2 * tp[valid_mask]) / denominator[valid_mask]
-        
+
         best_idx = np.argmax(f1_scores)
         if f1_scores[best_idx] > 0.0:
             thr[k] = grid[best_idx]
         else:
             thr[k] = np.clip(np.percentile(probs[:, k], 99.5) + 1e-5, 0.00001, 0.99999)
-            
+
     return thr
 
 
@@ -263,6 +262,7 @@ class ClassWiseAsymmetricIsotonicCalibrator:
     """
     Class-Wise Asymmetric Isotonic Regression (AIR) Calibrator.
     """
+
     def __init__(self, num_classes: int = 14):
         self.num_classes = num_classes
         self.calibrators: list[IsotonicRegression] = []
@@ -272,33 +272,33 @@ class ClassWiseAsymmetricIsotonicCalibrator:
         self.calibrators = []
         for c in range(self.num_classes):
             ir = IsotonicRegression(
-                y_min=0.0, 
-                y_max=1.0, 
-                increasing=True, 
+                y_min=0.0,
+                y_max=1.0,
+                increasing=True,
                 out_of_bounds="clip"
             )
             p_c = val_probs[:, c]
             y_c = val_labels[:, c]
-            
+
             jitter = np.linspace(-1e-9, 1e-9, len(p_c))
             p_c_stable = np.clip(p_c + jitter, 0.0, 1.0)
-            
+
             ir.fit(p_c_stable, y_c)
             self.calibrators.append(ir)
-            
+
         self.is_fitted = True
         return self
 
     def calibrate(self, probs: np.ndarray) -> np.ndarray:
         if not self.is_fitted:
             raise ValueError("Calibrator must be fitted on validation data before calibration.")
-            
+
         calibrated_probs = np.zeros_like(probs)
         for c in range(self.num_classes):
             p_c = np.clip(probs[:, c], 0.0, 1.0)
             raw_calibrated = self.calibrators[c].predict(p_c)
             calibrated_probs[:, c] = 0.999 * raw_calibrated + 0.001 * p_c
-            
+
         return np.clip(calibrated_probs, 1e-7, 1.0 - 1e-7)
 
 
@@ -306,16 +306,17 @@ class UncertaintyGatedAdaptiveConformalPredictor:
     """
     Implements a Conformal Risk Control (CRC) framework.
     """
+
     def __init__(
-        self, 
-        alpha: float = 0.10, 
-        lambda_param: float = 0.6, 
-        rejection_quantile: float = 0.10
+            self,
+            alpha: float = 0.10,
+            lambda_param: float = 0.6,
+            rejection_quantile: float = 0.10
     ):
         self.lambda_param = lambda_param
         self.rejection_quantile = rejection_quantile
         self.uncertainty_threshold: float | None = None
-        self.global_multipliers: np.ndarray | None = None  
+        self.global_multipliers: np.ndarray | None = None
         self.class_weights: np.ndarray | None = None
         self.opt_thresholds: np.ndarray | None = None
 
@@ -333,88 +334,88 @@ class UncertaintyGatedAdaptiveConformalPredictor:
             0.25,  # Emphysema
             0.30,  # Fibrosis
             0.30,  # Pleural_Thickening
-            0.30   # Hernia
+            0.30  # Hernia
         ])
 
     def calibrate(
-        self, 
-        cal_probs: np.ndarray, 
-        cal_labels: np.ndarray, 
-        opt_thresholds: np.ndarray, 
-        validation_aucs: np.ndarray | list[float], 
-        cal_uncertainties: np.ndarray
+            self,
+            cal_probs: np.ndarray,
+            cal_labels: np.ndarray,
+            opt_thresholds: np.ndarray,
+            validation_aucs: np.ndarray | list[float],
+            cal_uncertainties: np.ndarray
     ) -> None:
         self.opt_thresholds = opt_thresholds
         num_classes = cal_probs.shape[1]
-        
+
         self.uncertainty_threshold = float(
             np.quantile(cal_uncertainties, 1.0 - self.rejection_quantile)
         )
-        
+
         valid_mask = cal_uncertainties <= self.uncertainty_threshold
         cal_probs_filtered = cal_probs[valid_mask]
         cal_labels_filtered = cal_labels[valid_mask]
         n_cal = max(cal_probs_filtered.shape[0], 1)
-        
+
         aucs = np.array(validation_aucs)
         self.class_weights = 1.0 + self.lambda_param * (1.0 - aucs)
-        
+
         self.global_multipliers = np.ones(num_classes)
         multipliers = np.linspace(0.01, 10.0, 2000)
-        
+
         for c in range(num_classes):
             alpha_c = self.alphas[c]
             p_c = cal_probs_filtered[:, c]
             y_c_bool = ~cal_labels_filtered[:, c].astype(bool)
-            
+
             test_thresholds = np.clip(
-                self.opt_thresholds[c] * multipliers * self.class_weights[c], 
-                0.00001, 
+                self.opt_thresholds[c] * multipliers * self.class_weights[c],
+                0.00001,
                 0.99999
             )
-            
+
             preds_matrix = p_c[:, np.newaxis] >= test_thresholds[np.newaxis, :]
             fps_vector = (preds_matrix & y_c_bool[:, np.newaxis]).sum(axis=0)
-            
+
             empirical_risk = fps_vector / n_cal
             rc_bounds = (n_cal / (n_cal + 1)) * empirical_risk + (1.0 / (n_cal + 1))
-            
+
             satisfying_indices = np.where(rc_bounds <= alpha_c)[0]
             if len(satisfying_indices) > 0:
                 best_m = float(multipliers[satisfying_indices[0]])
             else:
                 best_m = 10.0
-                
+
             self.global_multipliers[c] = best_m
-            
-        log_process("conformal", "class_wise_crc_calibration_completed", 
+
+        log_process("conformal", "class_wise_crc_calibration_completed",
                     calibrated_multipliers=[float(x) for x in np.round(self.global_multipliers, 4)])
 
     def predict_sets(
-        self, 
-        test_probs: np.ndarray, 
-        test_uncertainties: np.ndarray, 
-        force_non_empty: bool = True
+            self,
+            test_probs: np.ndarray,
+            test_uncertainties: np.ndarray,
+            force_non_empty: bool = True
     ) -> dict[str, np.ndarray]:
         if self.uncertainty_threshold is None or self.class_weights is None or self.opt_thresholds is None:
             raise ValueError("Conformal predictor must be calibrated before prediction.")
 
         accepted_mask = test_uncertainties <= self.uncertainty_threshold
-        
+
         final_thr = np.clip(
-            self.opt_thresholds * self.global_multipliers * self.class_weights, 
-            0.00001, 
+            self.opt_thresholds * self.global_multipliers * self.class_weights,
+            0.00001,
             0.99999
         )
         sets = test_probs >= final_thr
-        
+
         if force_non_empty:
             empty_idx = (sets.sum(axis=1) == 0) & accepted_mask
             if empty_idx.any():
                 row_indices = np.where(empty_idx)[0]
                 col_indices = np.argmax(test_probs[empty_idx], axis=1)
                 sets[row_indices, col_indices] = True
-        
+
         return {
             "include_pos": sets,
             "accepted": accepted_mask

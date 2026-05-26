@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import os
 import gc
-import random
-import warnings
 import numpy as np
+import os
 import pandas as pd
+import random
 import torch
-import torch.nn.functional as F
+import warnings
 from scipy.stats import shapiro, spearmanr
 from sklearn.exceptions import UndefinedMetricWarning
 from sklearn.metrics import roc_auc_score
@@ -23,8 +22,7 @@ from config import (
     log_clinical_report,
     log_process,
 )
-from data import get_raw_datasets, get_dataloaders
-from audit import execute_forensic_audit
+from data import get_dataloaders
 from model import CXR_Synapse_Foundation
 from train import train_ensemble
 from evaluators import DeepEnsembleMCDropoutEvaluator, validate
@@ -65,13 +63,13 @@ def _safe_macro_auc(y_true: np.ndarray, y_pred: np.ndarray) -> float:
 
 
 def run_forensic_visual_audit(
-    test_labels: np.ndarray,
-    test_preds: np.ndarray,
-    conformal_sets: np.ndarray,
-    test_epistemic: np.ndarray,
-    val_probs: np.ndarray,
-    val_labels: np.ndarray,
-    opt_thresholds: np.ndarray,
+        test_labels: np.ndarray,
+        test_preds: np.ndarray,
+        conformal_sets: np.ndarray,
+        test_epistemic: np.ndarray,
+        val_probs: np.ndarray,
+        val_labels: np.ndarray,
+        opt_thresholds: np.ndarray,
 ) -> None:
     """Generates a detailed forensic visual audit report of the uncertainty dynamics."""
     audit_report = []
@@ -111,7 +109,7 @@ def run_forensic_visual_audit(
     for r in rejection_rates:
         num_rejected = int(len(test_epistemic) * r)
         kept_idx = rejection_order[num_rejected:]
-        
+
         class_aucs = []
         for i in range(test_labels.shape[1]):
             if len(np.unique(test_labels[kept_idx, i])) > 1:
@@ -154,14 +152,14 @@ def main() -> None:
     priors_clipped = np.clip(priors, 1e-4, 1.0 - 1e-4)
 
     adj_threshold = select_adjacency_threshold(train_labels_np, num_classes=14)
-    
+
     radlex_embeddings = ensure_radlex_embeddings(
         "radlex_embeddings_14.pth",
         RADLEX_PATHOLOGIES,
         "microsoft/BiomedVLP-BioViL-T",
         DEVICE,
     )
-    
+
     adj_norm = build_hybrid_clinical_adjacency(
         train_labels_np, radlex_embeddings, 14, adj_threshold, True
     )
@@ -205,17 +203,17 @@ def main() -> None:
     val_ensemble_results = val_ensemble_evaluator.evaluate(
         eval_val_loader, thresholds=None
     )
-    
+
     raw_val_probs_ens = val_ensemble_results["predictive_mean"]
-    val_uncertainties  = val_ensemble_results["epistemic_variance"]
+    val_uncertainties = val_ensemble_results["epistemic_variance"]
     val_labels = val_ensemble_results["labels"]
-    
+
     _, _, _, _, _, val_class_aucs = validate(
         pro_model, eval_val_loader, DEVICE, priors=priors_clipped
     )
-    
+
     opt_thresholds = optimise_thresholds(raw_val_probs_ens, val_labels)
-    
+
     thr_report = "\n".join(
         f"  - {ch:<18}: {t:.4f}" for ch, t in zip(CHESTMNIST_CLASS_NAMES, opt_thresholds)
     )
@@ -226,7 +224,7 @@ def main() -> None:
     print("[*] Calibrating probabilities via Class-Wise Asymmetric Isotonic Regression (AIR)...")
     air_calibrator = ClassWiseAsymmetricIsotonicCalibrator(num_classes=14)
     air_calibrator.fit(raw_val_probs_ens, val_labels)
-    
+
     val_probs = air_calibrator.calibrate(raw_val_probs_ens)
     log_process(
         "calibration",
@@ -254,18 +252,18 @@ def main() -> None:
     raw_test_preds = raw_ensemble_results["predictive_mean"]
     test_labels = raw_ensemble_results["labels"]
     test_epistemic = raw_ensemble_results["epistemic_variance"]
-    
+
     test_preds = air_calibrator.calibrate(raw_test_preds)
 
     stat_report = []
     stat_report.append("Verifying statistical assumptions for paired hypotheses testing...")
     residuals = test_preds.flatten() - base_preds.flatten()
-    
+
     # Sample 2000 points to prevent Shapiro-Wilk sample size inflation
     rng_test = np.random.RandomState(42)
     res_sample = rng_test.choice(residuals, 2000, replace=False)
     shapiro_stat, shapiro_p = shapiro(res_sample)
-    
+
     stat_report.append(
         f"  - Shapiro-Wilk normality of residuals: W = {shapiro_stat:.4f}, "
         f"p = {format_apa_p_value(shapiro_p)}"
@@ -286,7 +284,7 @@ def main() -> None:
     sig = paired_bootstrap_metric_test(
         _safe_macro_auc, test_labels, test_preds, base_preds
     )
-    
+
     stat_report.append("\nHypothesis Testing & Confidence Intervals:")
     stat_report.append(
         f"  - Ensemble Macro-AUROC: {_safe_macro_auc(test_labels, test_preds):.4f}"
@@ -297,7 +295,7 @@ def main() -> None:
     stat_report.append(
         f"  - Paired ΔAUROC Test  : p-value = {format_apa_p_value(sig['p_value'])}"
     )
-    
+
     log_clinical_report(
         "stats", "Statistical Validation & Assumptions", "\n".join(stat_report)
     )
@@ -305,7 +303,7 @@ def main() -> None:
     conformal_predictor = UncertaintyGatedAdaptiveConformalPredictor(
         rejection_quantile=0.10
     )
-    
+
     conformal_predictor.calibrate(
         val_probs, val_labels, cal_opt_thresholds, val_class_aucs, val_uncertainties
     )
@@ -313,19 +311,19 @@ def main() -> None:
     conformal_res = conformal_predictor.predict_sets(test_preds, test_epistemic)
     conformal_sets = conformal_res["include_pos"]
     accepted_mask = conformal_res["accepted"]
-    
+
     true_positives = test_labels.astype(bool)
-    
+
     sick_mask = true_positives[accepted_mask].sum(axis=1) > 0
     covered_patients = (
-        (
-            conformal_sets[accepted_mask][sick_mask]
-            & true_positives[accepted_mask][sick_mask]
-        ).sum(axis=1)
-        > 0
+            (
+                    conformal_sets[accepted_mask][sick_mask]
+                    & true_positives[accepted_mask][sick_mask]
+            ).sum(axis=1)
+            > 0
     )
     clinical_coverage = covered_patients.sum() / max(sick_mask.sum(), 1)
-    
+
     per_class_cover = (conformal_sets[accepted_mask] & true_positives[accepted_mask]).sum(
         axis=0
     ) / np.maximum(true_positives[accepted_mask].sum(axis=0), 1)
@@ -356,7 +354,7 @@ def main() -> None:
         for feats, _ in eval_test_loader:
             B = feats.shape[0]
             proj = pro_model.dim_reduction(feats.view(B, -1, 1376).to(DEVICE))
-            pooled = proj.mean(dim=1).cpu().numpy()   
+            pooled = proj.mean(dim=1).cpu().numpy()
             feature_batches.append(pooled)
 
     plot_semantic_manifold(
