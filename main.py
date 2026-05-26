@@ -28,7 +28,7 @@ from data import get_raw_datasets, get_dataloaders
 from audit import execute_forensic_audit
 from model import CXR_Synapse_Foundation
 from train import train_ensemble
-from evaluators import DeepEnsembleTTAEvaluator, validate
+from evaluators import DeepEnsembleMCDropoutEvaluator, validate
 from utils import (
     CHESTMNIST_CLASS_NAMES,
     RADLEX_PATHOLOGIES,
@@ -202,7 +202,7 @@ def main() -> None:
 
     # PHASE 3 — METRICS & CONFORMAL CALIBRATION
     # 1. Uncalibrated validation evaluation
-    val_ensemble_evaluator = DeepEnsembleTTAEvaluator(
+    val_ensemble_evaluator = DeepEnsembleMCDropoutEvaluator(
         model_class=CXR_Synapse_Foundation,
         checkpoint_paths=ensemble_checkpoints,
         device_=DEVICE,
@@ -263,8 +263,8 @@ def main() -> None:
     base_preds = air_calibrator.calibrate(raw_base_preds)
 
     # 4. Calibrated Ensemble Test Evaluation (AIR-calibrated & Jensen-safe)
-    # Pass UNCALIBRATED thresholds to DeepEnsembleTTAEvaluator to evaluate metrics under uncalibrated logits
-    raw_ensemble_results = DeepEnsembleTTAEvaluator(
+    # Pass UNCALIBRATED thresholds to DeepEnsembleMCDropoutEvaluator to evaluate metrics under uncalibrated logits
+    raw_ensemble_results = DeepEnsembleMCDropoutEvaluator(
         model_class=CXR_Synapse_Foundation,
         checkpoint_paths=ensemble_checkpoints,
         device_=DEVICE,

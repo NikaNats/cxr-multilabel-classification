@@ -29,6 +29,13 @@ except ImportError:
     from umap.utils import disconnected_vertices
     _HAS_CUML = False
 
+# Statsmodels check for safe lowess regression fallback
+try:
+    import statsmodels.api as sm
+    _HAS_STATSMODELS = True
+except ImportError:
+    _HAS_STATSMODELS = False
+
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -102,18 +109,20 @@ def configure_nature_style() -> None:
     sns.set_theme(style="white", palette=COLOUR_CYCLE, rc=_NATURE_RCPARAMS)
 
 def _shorten_name(name: str) -> str:
-    """Intelligently abbreviates long pathology names to prevent overlapping."""
+    """Intelligently abbreviates long pathology names to prevent overlapping, removing underscores."""
     mapping = {
         "Cardiomegaly": "Cardiom.",
         "Atelectasis": "Atelect.",
         "Infiltration": "Infiltr.",
         "Pneumothorax": "Pneumoth.",
         "Consolidation": "Consol.",
-        "Pleural_Thickening": "Pleural_Th.",
-        "Pleural_Thicken": "Pleural_Th.",
+        "Pleural_Thickening": "Pleural Th.",
+        "Pleural_Thicken": "Pleural Th.",
+        "Pleural Thickening": "Pleural Th.",
         "Emphysema": "Emphys.",
     }
-    return mapping.get(name, name[:10])
+    val = mapping.get(name, name[:10])
+    return val.replace("_", " ")
 
 # ==============================================================================
 # § 2  SHARED DATA CONTAINER
@@ -273,25 +282,33 @@ def _draw_uncertainty_vs_set_size(ax: plt.Axes, data: _DiagnosticData) -> None:
     """Plots epistemic uncertainty versus conformal set size."""
     n = min(len(data.uncertainty), 1500)
     
-    sns.regplot(
-        x=data.uncertainty[:n], 
-        y=data.set_sizes[:n], 
-        ax=ax,
-        scatter_kws={
+    # Dynamic dictionary expansion to avoid None comparison TypeError in Seaborn regplot
+    reg_kwargs = {
+        "x": data.uncertainty[:n],
+        "y": data.set_sizes[:n],
+        "ax": ax,
+        "scatter_kws": {
             "alpha": 0.15, 
             "s": 4, 
             "color": Colour.GREEN, 
             "linewidths": 0,    
             "rasterized": True  
         },
-        line_kws={
+        "line_kws": {
             "color": Colour.ORANGE, 
             "linewidth": 1.2,
             "zorder": 5         
         }
-    )
+    }
     
-    ax.set_xlabel("Epistemic uncertainty (entropy)")
+    if _HAS_STATSMODELS:
+        reg_kwargs["lowess"] = True
+    else:
+        reg_kwargs["order"] = 1
+        
+    sns.regplot(**reg_kwargs)
+    
+    ax.set_xlabel("Epistemic uncertainty (Mutual Information)")
     ax.set_ylabel("Conformal set size (count)")
     ax.set_title("Uncertainty vs. set size")
     
@@ -395,7 +412,7 @@ def _draw_uncertainty_by_error(ax: plt.Axes, data: _DiagnosticData) -> None:
         clip=(0, None), label="High error"
     )
     
-    ax.set_xlabel("Epistemic uncertainty (entropy)")
+    ax.set_xlabel("Epistemic uncertainty (Mutual Information)")
     ax.set_ylabel("Density (proportion)")
     ax.set_title("Uncertainty by error profile")
     
@@ -582,7 +599,6 @@ def _draw_decision_curve(ax: plt.Axes, data: _DiagnosticData) -> None:
 
 def _draw_uncertainty_by_class(ax: plt.Axes, data: _DiagnosticData) -> None:
     """Plots epistemic uncertainty partitioned by medical pathologies."""
-    # OPTIMIZATION: Vectorized DataFrame generation avoids slow nested Python loops
     uncertainty_list = []
     pathology_list = []
     
@@ -622,7 +638,7 @@ def _draw_uncertainty_by_class(ax: plt.Axes, data: _DiagnosticData) -> None:
         zorder=2
     )
     
-    ax.set_xlabel("Epistemic uncertainty (entropy)")
+    ax.set_xlabel("Epistemic uncertainty (Mutual Information)")
     ax.set_ylabel("")
     ax.set_title("Epistemic profiles (True Positives)")
     
@@ -770,7 +786,7 @@ def _draw_entropy_gap(ax: plt.Axes, data: _DiagnosticData) -> None:
         clip=(0, None), label="Healthy (0)"
     )
     
-    ax.set_xlabel("Epistemic uncertainty (entropy)")
+    ax.set_xlabel("Epistemic uncertainty (Mutual Information)")
     ax.set_ylabel("Density (proportion)")
     ax.set_title("Epistemic entropy gap")
     

@@ -16,7 +16,7 @@ from tqdm.auto import tqdm
 
 from config import log_process, DEVICE
 from evaluators import validate
-from model import CXR_Synapse_Foundation, AsymmetricLoss
+from model import CXR_Synapse_Foundation  # AsymmetricLoss იმპორტი აღარ არის საჭირო
 from utils import ensure_radlex_embeddings, RADLEX_PATHOLOGIES, EarlyStopping
 
 CFG: dict[str, Any] = {
@@ -30,6 +30,69 @@ CFG: dict[str, Any] = {
     "max_grad_norm": 1.0,
 }
 
+
+# ==============================================================================
+# § 1  STANDALONE CLASS-BALANCED ASYMMETRIC LOSS (CB-ASL)
+# ==============================================================================
+class ClassBalancedAsymmetricLoss(nn.Module):
+    """
+    Numerically stable Class-Balanced Asymmetric Loss (CB-ASL).
+    Dynamically scales loss gradients using inverse Effective Number of Samples (ENS).
+    """
+    def __init__(
+        self,
+        gamma_neg: float = 4.0,
+        gamma_pos: float = 1.0,
+        clip: float = 0.05,
+        eps: float = 1e-8,
+        class_weights: torch.Tensor | None = None
+    ):
+        super().__init__()
+        self.gamma_neg = gamma_neg
+        self.gamma_pos = gamma_pos
+        self.clip = clip
+        self.eps = eps
+        if class_weights is not None:
+            self.register_buffer("class_weights", class_weights.float())
+        else:
+            self.class_weights = None
+
+    def forward(self, x: torch.Tensor, y: torch.Tensor, epoch: int | None = None) -> torch.Tensor:
+        log_xs_pos = F.logsigmoid(x)
+        log_xs_neg = F.logsigmoid(-x)
+
+        xs_pos = torch.sigmoid(x)
+        xs_neg = 1.0 - xs_pos
+
+        if self.clip is not None and self.clip > 0:
+            xs_neg_clipped = (xs_neg + self.clip).clamp(max=1.0)
+            log_xs_neg = torch.log(xs_neg_clipped)
+        else:
+            xs_neg_clipped = xs_neg
+
+        loss_pos = y * log_xs_pos
+        loss_neg = (1.0 - y) * log_xs_neg
+
+        if self.gamma_pos > 0 or self.gamma_neg > 0:
+            if self.gamma_pos > 0:
+                factors_pos = (1.0 - xs_pos) ** self.gamma_pos
+                loss_pos *= factors_pos
+            if self.gamma_neg > 0:
+                factors_neg = (1.0 - xs_neg_clipped) ** self.gamma_neg
+                loss_neg *= factors_neg
+
+        loss = loss_pos + loss_neg
+        
+        # კლასობრივი წონების ვექტორიზებული გამოყენება
+        if self.class_weights is not None:
+            loss = loss * self.class_weights.unsqueeze(0)
+
+        return -loss.mean()
+
+
+# ==============================================================================
+# § 2  TRAINING ENGINE
+# ==============================================================================
 
 def train_single_model(
     seed: int,
@@ -62,10 +125,20 @@ def train_single_model(
     priors = np.clip(priors, 1e-4, 1.0 - 1e-4)
     model.set_priors(priors)
 
-    loss_fn = AsymmetricLoss(
+    # კლასობრივად ბალანსირებული წონების (ENS, beta = 0.9999) გამოთვლა
+    beta = 0.9999
+    class_counts = np.clip(np.sum(train_labels_np, axis=0), 1.0, None)
+    ens = (1.0 - np.power(beta, class_counts)) / (1.0 - beta)
+    raw_weights = 1.0 / ens
+    normalized_weights = raw_weights / np.mean(raw_weights)
+    class_weights_tensor = torch.from_numpy(normalized_weights).to(DEVICE)
+
+    # ლოკალურად ინიციალიზებული CB-ASL დანაკარგის ფუნქცია
+    loss_fn = ClassBalancedAsymmetricLoss(
         gamma_neg=4.0, 
         gamma_pos=1.0, 
-        clip=0.05
+        clip=0.05,
+        class_weights=class_weights_tensor
     ).to(DEVICE)
 
     decay_params = []

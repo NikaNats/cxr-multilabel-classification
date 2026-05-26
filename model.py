@@ -8,38 +8,60 @@ import torch.nn.functional as F
 
 
 # ==============================================================================
-# § 1  ANATOMICAL 2D POSITIONAL ENCODING
+# § 1  2D ROTARY POSITION EMBEDDING (2D RoPE) — SOTA 2025/2026
 # ==============================================================================
 
-def get_2d_sincos_pos_embed(
-    embed_dim: int, grid_size: int, temperature: float = 10000.0
-) -> torch.Tensor:
-    grid_h = np.arange(grid_size, dtype=np.float32)
-    grid_w = np.arange(grid_size, dtype=np.float32)
-    grid = np.meshgrid(grid_w, grid_h)
-    grid = np.stack(grid, axis=0)
+def apply_2d_rope(x: torch.Tensor, grid_size: int = 8) -> torch.Tensor:
+    """
+    Applies 2D Rotary Position Embeddings (RoPE) to a spatial feature tensor.
+    Preserves semantic energy of frozen backbone representations.
     
-    pos_embed = np.zeros((grid_size * grid_size, embed_dim), dtype=np.float32)
-    dim_t = np.arange(embed_dim // 2, dtype=np.float32)
-    dim_t = temperature ** (2 * (dim_t // 2) / (embed_dim // 2))
+    Args:
+        x: Tensor of shape (batch_size, grid_size * grid_size, feat_dim)
+        grid_size: Spatial resolution of the patch grid (default: 8x8)
+    Returns:
+        Rotated tensor of the same shape.
+    """
+    batch_size, num_patches, feat_dim = x.shape
+    device = x.device
     
-    pos_h = grid[1].reshape(-1, 1) / dim_t
-    pos_w = grid[0].reshape(-1, 1) / dim_t
+    # კუთხური სიხშირეების გენერირება
+    dim_half = feat_dim // 2
+    inv_freq = 1.0 / (10000.0 ** (torch.arange(0, dim_half, 2, dtype=torch.float32, device=device) / dim_half))
     
-    pos_embed[:, 0 : embed_dim // 2 : 2] = np.sin(pos_h[:, 0::2])
-    pos_embed[:, 1 : embed_dim // 2 : 2] = np.cos(pos_h[:, 1::2])
-    pos_embed[:, embed_dim // 2 : : 2] = np.sin(pos_w[:, 0::2])
-    pos_embed[:, embed_dim // 2 + 1 : : 2] = np.cos(pos_w[:, 1::2])
+    # 2D ბადის კოორდინატების აგება
+    t = torch.arange(grid_size, dtype=torch.float32, device=device)
+    grid_y, grid_x = torch.meshgrid(t, t, indexing="ij")
+    grid_y, grid_x = grid_y.reshape(-1), grid_x.reshape(-1) # Shape: (64,)
     
-    return torch.from_numpy(pos_embed).unsqueeze(0)
+    # ფაზების გამოთვლა x და y კოორდინატებისთვის
+    freqs_x = torch.outer(grid_x, inv_freq) # (64, dim_half/2)
+    freqs_y = torch.outer(grid_y, inv_freq) # (64, dim_half/2)
+    
+    # სინუსურ-კოსინუსური მატრიცების გაერთიანება
+    freqs = torch.cat([freqs_x, freqs_y], dim=-1) # (64, dim_half)
+    emb = torch.cat([freqs, freqs], dim=-1) # (64, feat_dim)
+    
+    cos = emb.cos().unsqueeze(0) # (1, 64, feat_dim)
+    sin = emb.sin().unsqueeze(0) # (1, 64, feat_dim)
+    
+    # როტაციული მატრიცის ტრიუკი (Rotary embedding transformation)
+    def rotate_half(tensor):
+        t1 = tensor[..., :tensor.shape[-1] // 2]
+        t2 = tensor[..., tensor.shape[-1] // 2:]
+        return torch.cat((-t2, t1), dim=-1)
+
+    # როტაციული ბრუნვის გამოყენება
+    x_rotated = (x * cos) + (rotate_half(x) * sin)
+    return x_rotated
 
 
 # ==============================================================================
-# § 2  CALIBRATED MULTI-LABEL PROBABILITIES & SHANNON ENTROPY (REPLACED EDL)
+# § 2  CALIBRATED MULTI-LABEL PROBABILITIES & SHANNON ENTROPY
 # ==============================================================================
 
 def get_evidential_metrics(
-    z_v: torch.Tensor, priors: torch.Tensor | np.ndarray | None = None, W: float = 2.0
+    z_v: torch.Tensor, priors: torch.Tensor | np.ndarray | None = None
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     Calculates multi-label evidential metrics.
@@ -61,13 +83,13 @@ def get_evidential_metrics(
 
 
 # ==============================================================================
-# § 3  PATHOLOGY-AS-QUERY (PaQ) SPATIAL CROSS-ATTENTION
+# § 3  PATHOLOGY-AS-QUERY (PaQ) SPATIAL CROSS-ATTENTION WITH 2D RoPE
 # ==============================================================================
 
 class PathologyCrossAttention(nn.Module):
     """
     Routes localized chest embeddings using pathology-specific RadLex queries 
-    and structured clinical graph adjacency maps.
+    and structured clinical graph adjacency maps with 2D RoPE.
     """
     def __init__(
         self,
@@ -117,8 +139,14 @@ class PathologyCrossAttention(nn.Module):
         )
         queries = self.norm_self(fused_queries + self_out)
         
-        attn_out, _ = self.cross_attn(query=queries, key=patches, value=patches)
-        hidden_cross = self.norm_cross(attn_out)
+        # 1. 2D RoPE-ის გამოყენება სივრცით პატჩებზე (კროს-ყურადღებამდე)
+        # ეს მათემატიკურად სუფთად ახდენს სივრცითი კოორდინატების პროექციას
+        rotated_patches = apply_2d_rope(patches, grid_size=8)
+        
+        attn_out, _ = self.cross_attn(query=queries, key=rotated_patches, value=rotated_patches)
+        
+        # რეზიდუალური კავშირი კროს-ყურადღების შემდგომ
+        hidden_cross = self.norm_cross(queries + attn_out)
         
         disease_features = self.norm_ffn(hidden_cross + self.ffn(hidden_cross))
         
@@ -136,7 +164,7 @@ class PathologyCrossAttention(nn.Module):
 # ==============================================================================
 
 class CXR_Synapse_Foundation(nn.Module):
-    """Main chest X-ray foundation architecture with Graph-Guided cross-attention."""
+    """Main chest X-ray foundation architecture with Graph-Guided cross-attention and 2D RoPE."""
     def __init__(
         self,
         num_classes: int = 14,
@@ -155,8 +183,7 @@ class CXR_Synapse_Foundation(nn.Module):
             nn.GELU(),
         )
         
-        pos_emb = get_2d_sincos_pos_embed(feat_dim, grid_size=8)
-        self.register_buffer("pos_embed", pos_emb)
+        # ძველი ადიტიური pos_embed მთლიანად ამოღებულია არქიტექტურიდან
         self.pathology_router = PathologyCrossAttention(num_classes, 768, feat_dim)
         
         self.register_buffer("radlex_emb", torch.zeros(num_classes, 768))
@@ -174,16 +201,17 @@ class CXR_Synapse_Foundation(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         batch_size, h_spatial, w_spatial, channels = x.shape
-        patches = x.view(batch_size, h_spatial * w_spatial, channels)
-        proj = self.dim_reduction(patches)
-        proj = proj + self.pos_embed
         
+        patches = x.reshape(batch_size, h_spatial * w_spatial, channels)
+        proj = self.dim_reduction(patches)
+        
+        # 2D RoPE ავტომატურად შესრულდება PathologyCrossAttention მოდულის შიგნით
         z_v, _ = self.pathology_router(proj, self.radlex_emb, self.adjacency_mask)
         return z_v
 
 
 # ==============================================================================
-# § 5  ASYMMETRIC LOSS (ASL) FOR RIGOROUS IMBALANCE CONTROL
+# § 5  ASYMMETRIC LOSS (ASL) WITH NUMERICAL STABILITY
 # ==============================================================================
 
 class AsymmetricLoss(nn.Module):
@@ -201,23 +229,28 @@ class AsymmetricLoss(nn.Module):
         self.eps = eps
 
     def forward(self, x: torch.Tensor, y: torch.Tensor, epoch: int | None = None) -> torch.Tensor:
+        log_xs_pos = F.logsigmoid(x)
+        log_xs_neg = F.logsigmoid(-x)
+
         xs_pos = torch.sigmoid(x)
         xs_neg = 1.0 - xs_pos
 
         if self.clip is not None and self.clip > 0:
-            xs_neg = (xs_neg + self.clip).clamp(max=1.0)
+            xs_neg_clipped = (xs_neg + self.clip).clamp(max=1.0)
+            log_xs_neg = torch.log(xs_neg_clipped)
+        else:
+            xs_neg_clipped = xs_neg
 
-        loss_pos = y * torch.log(xs_pos.clamp(min=self.eps))
-        loss_neg = (1.0 - y) * torch.log(xs_neg.clamp(min=self.eps))
-        loss = loss_pos + loss_neg
+        loss_pos = y * log_xs_pos
+        loss_neg = (1.0 - y) * log_xs_neg
 
         if self.gamma_pos > 0 or self.gamma_neg > 0:
             if self.gamma_pos > 0:
                 factors_pos = (1.0 - xs_pos) ** self.gamma_pos
                 loss_pos *= factors_pos
             if self.gamma_neg > 0:
-                factors_neg = (1.0 - xs_neg) ** self.gamma_neg
+                factors_neg = (1.0 - xs_neg_clipped) ** self.gamma_neg
                 loss_neg *= factors_neg
-            loss = loss_pos + loss_neg
 
+        loss = loss_pos + loss_neg
         return -loss.mean()
