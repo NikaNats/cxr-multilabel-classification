@@ -406,9 +406,9 @@ research, please cite the work using the academic reference below:
 
 ```bibtex
 @mastersthesis{cxrsynapse2025,
-  author    = {Author Name},
+  author    = {Nika Natsvlishvili},
   title     = {CXR-Synapse: Clinical Graph-Guided Multi-Label Attention Foundations for Thoracic Imaging},
   school    = {Master's Thesis Project},
-  year      = {2025}
+  year      = {2026}
 }
 ```
