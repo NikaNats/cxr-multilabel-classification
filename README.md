@@ -10,7 +10,7 @@ probability calibration via Asymmetric Isotonic Regression (AIR), and assess ris
 prediction.
 
 ## System Architecture
-![CXR-Synapse System Architecture](architecture.png)
+![CXR-Synapse System Architecture](Architecture.png)
 
 
 ## Technical Overview
