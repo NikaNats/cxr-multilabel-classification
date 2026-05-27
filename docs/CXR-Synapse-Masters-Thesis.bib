@@ -81,61 +81,58 @@
 }
 
 @article{BUSTOS2020101797,
-title = {PadChest: A large chest x-ray image dataset with multi-label annotated reports},
-journal = {Medical Image Analysis},
-volume = {66},
-pages = {101797},
-year = {2020},
-issn = {1361-8415},
-doi = {10.1016/j.media.2020.101797},
-url = {https://www.sciencedirect.com/science/article/pii/S1361841520301614},
-author = {Aurelia Bustos and Antonio Pertusa and Jose-Maria Salinas and Maria {de la Iglesia-Vayá}},
-keywords = {X-Ray image dataset, Deep neural networks, Radiographic findings, Differential diagnoses, Anatomical locations},
-abstract = {We present a labeled large-scale, high resolution chest x-ray dataset for the automated exploration of medical images along with their associated reports. This dataset includes more than 160,000 images obtained from 67,000 patients that were interpreted and reported by radiologists at San Juan Hospital (Spain) from 2009 to 2017, covering six different position views and additional information on image acquisition and patient demography. The reports were labeled with 174 different radiographic findings, 19 differential diagnoses and 104 anatomic locations organized as a hierarchical taxonomy and mapped onto standard Unified Medical Language System (UMLS) terminology. Of these reports, 27% were manually annotated by trained physicians and the remaining set was labeled using a supervised method based on a recurrent neural network with attention mechanisms. The labels generated were then validated in an independent test set achieving a 0.93 Micro-F1 score. To the best of our knowledge, this is one of the largest public chest x-ray databases suitable for training supervised models concerning radiographs, and the first to contain radiographic reports in Spanish. The PadChest dataset can be downloaded from http://bimcv.cipf.es/bimcv-projects/padchest/.}
+  title     = {PadChest: A large chest x-ray image dataset with multi-label annotated reports},
+  journal   = {Medical Image Analysis},
+  volume    = {66},
+  pages     = {101797},
+  year      = {2020},
+  issn      = {1361-8415},
+  doi       = {10.1016/j.media.2020.101797},
+  url       = {https://www.sciencedirect.com/science/article/pii/S1361841520301614},
+  author    = {Aurelia Bustos and Antonio Pertusa and Jose-Maria Salinas and Maria {de la Iglesia-Vayá}},
+  keywords  = {X-Ray image dataset, Deep neural networks, Radiographic findings, Differential diagnoses, Anatomical locations},
+  abstract  = {We present a labeled large-scale, high resolution chest x-ray dataset for the automated exploration of medical images along with their associated reports. This dataset includes more than 160,000 images obtained from 67,000 patients that were interpreted and reported by radiologists at San Juan Hospital (Spain) from 2009 to 2017, covering six different position views and additional information on image acquisition and patient demography. The reports were labeled with 174 different radiographic findings, 19 differential diagnoses and 104 anatomic locations organized as a hierarchical taxonomy and mapped onto standard Unified Medical Language System (UMLS) terminology. Of these reports, 27% were manually annotated by trained physicians and the remaining set was labeled using a supervised method based on a recurrent neural network with attention mechanisms. The labels generated were then validated in an independent test set achieving a 0.93 Micro-F1 score. To the best of our knowledge, this is one of the largest public chest x-ray databases suitable for training supervised models concerning radiographs, and the first to contain radiographic reports in Spanish. The PadChest dataset can be downloaded from http://bimcv.cipf.es/bimcv-projects/padchest/.}
 }
-
 
 @InProceedings{pmlr-v102-chen19a,
-  title = 	 {Deep Hierarchical Multi-label Classification of Chest X-ray Images},
-  author =       {Chen, Haomin and Miao, Shun and Xu, Daguang and Hager, Gregory D. and Harrison, Adam P.},
-  booktitle = 	 {Proceedings of The 2nd International Conference on Medical Imaging with Deep Learning},
-  pages = 	 {109--120},
-  year = 	 {2019},
-  editor = 	 {Cardoso, M. Jorge and Feragen, Aasa and Glocker, Ben and Konukoglu, Ender and Oguz, Ipek and Unal, Gozde and Vercauteren, Tom},
-  volume = 	 {102},
-  series = 	 {Proceedings of Machine Learning Research},
-  month = 	 {08--10 Jul},
-  publisher =    {PMLR},
-  pdf = 	 {http://proceedings.mlr.press/v102/chen19a/chen19a.pdf},
-  url = 	 {https://proceedings.mlr.press/v102/chen19a.html},
-  abstract = 	 {Chest X-rays (CXRs) are a crucial and extraordinarily common diagnostic tool, leading to heavy research for Computer-Aided Diagnosis (CAD) solutions. However, both high classification accuracy and meaningful model predictions that respect and incorporate clinical taxonomies are crucial for CAD usability. To this end, we present a deep Hierarchical Multi-Label Classification (HMLC) approach for CXR CAD. Different than other hierarchical systems, we show that first training the network to model conditional probability directly and then refining it with unconditional probabilities is key in boosting performance. In addition, we also formulate a numerically stable cross-entropy loss function for unconditional probabilities that provides concrete performance improvements. To the best of our knowledge, we are the first to apply HMLC to medical imaging CAD. We extensively evaluate our approach on detecting 14 abnormality labels from the PLCO dataset, which comprises 198,000 manually annotated CXRs. We report a mean Area Under the Curve (AUC) of 0.887, the highest yet reported for this dataset. These performance improvements, combined with the inherent usefulness of taxonomic predictions, indicate that our approach represents a useful step forward for CXR CAD.}
+  title     = {Deep Hierarchical Multi-label Classification of Chest X-ray Images},
+  author    = {Chen, Haomin and Miao, Shun and Xu, Daguang and Hager, Gregory D. and Harrison, Adam P.},
+  booktitle = {Proceedings of The 2nd International Conference on Medical Imaging with Deep Learning},
+  pages     = {109--120},
+  year      = {2019},
+  editor    = {Cardoso, M. Jorge and Feragen, Aasa and Glocker, Ben and Konukoglu, Ender and Oguz, Ipek and Unal, Gozde and Vercauteren, Tom},
+  volume    = {102},
+  series    = {Proceedings of Machine Learning Research},
+  month     = {08--10 Jul},
+  publisher = {PMLR},
+  pdf       = {http://proceedings.mlr.press/v102/chen19a/chen19a.pdf},
+  url       = {https://proceedings.mlr.press/v102/chen19a.html},
+  abstract  = {Chest X-rays (CXRs) are a crucial and extraordinarily common diagnostic tool, leading to heavy research for Computer-Aided Diagnosis (CAD) solutions. However, both high classification accuracy and meaningful model predictions that respect and incorporate clinical taxonomies are crucial for CAD usability. To this end, we present a deep Hierarchical Multi-Label Classification (HMLC) approach for CXR CAD. Different than other hierarchical systems, we show that first training the network to model conditional probability directly and then refining it with unconditional probabilities is key in boosting performance. In addition, we also formulate a numerically stable cross-entropy loss function for unconditional probabilities that provides concrete performance improvements. To the best of our knowledge, we are the first to apply HMLC to medical imaging CAD. We extensively evaluate our approach on detecting 14 abnormality labels from the PLCO dataset, which comprises 198,000 manually annotated CXRs. We report a mean Area Under the Curve (AUC) of 0.887, the highest yet reported for this dataset. These performance improvements, combined with the inherent usefulness of taxonomic predictions, indicate that our approach represents a useful step forward for CXR CAD.}
 }
-
 
 @article {Collinsg7594,
-	author = {Collins, Gary S and Reitsma, Johannes B and Altman, Douglas G and Moons, Karel G M},
-	title = {Transparent reporting of a multivariable prediction model for individual prognosis or diagnosis (TRIPOD): the TRIPOD statement},
-	volume = {350},
-	elocation-id = {g7594},
-	year = {2015},
-	doi = {10.1136/bmj.g7594},
-	publisher = {BMJ Publishing Group Ltd},
-	abstract = {Prediction models are developed to aid health care providers in estimating the probability or risk that a specific disease or condition is present (diagnostic models) or that a specific event will occur in the future (prognostic models), to inform their decision making. However, the overwhelming evidence shows that the quality of reporting of prediction model studies is poor. Only with full and clear reporting of information on all aspects of a prediction model can risk of bias and potential usefulness of prediction models be adequately assessed. The Transparent Reporting of a multivariable prediction model for Individual Prognosis Or Diagnosis (TRIPOD) Initiative developed a set of recommendations for the reporting of studies developing, validating, or updating a prediction model, whether for diagnostic or prognostic purposes. This article describes how the TRIPOD Statement was developed. An extensive list of items based on a review of the literature was created, which was reduced after a Web based survey and revised during a three day meeting in June 2011 with methodologists, health care professionals, and journal editors. The list was refined during several meetings of the steering group and in e-mail discussions with the wider group of TRIPOD contributors. The resulting TRIPOD Statement is a checklist of 22 items, deemed essential for transparent reporting of a prediction model study. The TRIPOD Statement aims to improve the transparency of the reporting of a prediction model study regardless of the study methods used. The TRIPOD Statement is best used in conjunction with the TRIPOD explanation and elaboration document. To aid the editorial process and readers of prediction model studies, it is recommended that authors include a completed checklist in their submission (also available at www.tripod-statement.org).To encourage dissemination of the TRIPOD Statement, this article is freely accessible on the Annals of Internal Medicine Web site (www.annals.org) and will be also published in BJOG, British Journal of Cancer, British Journal of Surgery, BMC Medicine, The BMJ, Circulation, Diabetic Medicine, European Journal of Clinical Investigation, European Urology, and Journal of Clinical Epidemiology. The authors jointly hold the copyright of this article. An accompanying explanation and elaboration article is freely available only on www.annals.org; Annals of Internal Medicine holds copyright for that article.},
-	URL = {https://www.bmj.com/content/350/bmj.g7594},
-	eprint = {https://www.bmj.com/content/350/bmj.g7594.full.pdf},
-	journal = {BMJ}
+  author    = {Collins, Gary S and Reitsma, Johannes B and Altman, Douglas G and Moons, Karel G M},
+  title     = {Transparent reporting of a multivariable prediction model for individual prognosis or diagnosis (TRIPOD): the TRIPOD statement},
+  volume    = {350},
+  elocation-id = {g7594},
+  year      = {2015},
+  doi       = {10.1136/bmj.g7594},
+  publisher = {BMJ Publishing Group Ltd},
+  abstract  = {Prediction models are developed to aid health care providers in estimating the probability or risk that a specific disease or condition is present (diagnostic models) or that a specific event will occur in the future (prognostic models), to inform their decision making. However, the overwhelming evidence shows that the quality of reporting of prediction model studies is poor. Only with full and clear reporting of information on all aspects of a prediction model can risk of bias and potential usefulness of prediction models be adequately assessed. The Transparent Reporting of a multivariable prediction model for Individual Prognosis Or Diagnosis (TRIPOD) Initiative developed a set of recommendations for the reporting of studies developing, validating, or updating a prediction model, whether for diagnostic or prognostic purposes. This article describes how the TRIPOD Statement was developed. An extensive list of items based on a review of the literature was created, which was reduced after a Web based survey and revised during a three day meeting in June 2011 with methodologists, health care professionals, and journal editors. The list was refined during several meetings of the steering group and in e-mail discussions with the wider group of TRIPOD contributors. The resulting TRIPOD Statement is a checklist of 22 items, deemed essential for transparent reporting of a prediction model study. The TRIPOD Statement aims to improve the transparency of the reporting of a prediction model study regardless of the study methods used. The TRIPOD Statement is best used in conjunction with the TRIPOD explanation and elaboration document. To aid the editorial process and readers of prediction model studies, it is recommended that authors include a completed checklist in their submission (also available at www.tripod-statement.org).To encourage dissemination of the TRIPOD Statement, this article is freely accessible on the Annals of Internal Medicine Web site (www.annals.org) and will be also published in BJOG, British Journal of Cancer, British Journal of Surgery, BMC Medicine, The BMJ, Circulation, Diabetic Medicine, European Journal of Clinical Investigation, European Urology, and Journal of Clinical Epidemiology. The authors jointly hold the copyright of this article. An accompanying explanation and elaboration article is freely available only on www.annals.org; Annals of Internal Medicine holds copyright for that article.},
+  URL       = {https://www.bmj.com/content/350/bmj.g7594},
+  eprint    = {https://www.bmj.com/content/350/bmj.g7594.full.pdf},
+  journal   = {BMJ}
 }
 
-
 @InProceedings{CuiXia_Information_MICCAI2025,
-        author = { Cui, Xiaoxiao AND Li, Yiran AND He, Kai AND Jiang, Shanzhi AND Xue, Mengli AND Li, Wentao AND Leng, Junhong AND Liu, Zhi AND Cui, Lizhen AND Li, Shuo},
-        title = { { Information Bottleneck-based Causal Attention for Multi-label Medical Image Recognition } },
-        booktitle = {proceedings of Medical Image Computing and Computer Assisted Intervention -- MICCAI 2025},
-        year = {2025},
-        publisher = {Springer Nature Switzerland},
-        volume = {LNCS 15967},
-        month = {September},
-        page = {236 -- 246}
+  author    = {Cui, Xiaoxiao and Li, Yiran and He, Kai and Jiang, Shanzhi and Xue, Mengli and Li, Wentao and Leng, Junhong and Liu, Zhi and Cui, Lizhen and Li, Shuo},
+  title     = {{Information Bottleneck-based Causal Attention for Multi-label Medical Image Recognition}},
+  booktitle = {proceedings of Medical Image Computing and Computer Assisted Intervention -- MICCAI 2025},
+  year      = {2025},
+  publisher = {Springer Nature Switzerland},
+  volume    = {LNCS 15967},
+  month     = {September},
+  pages     = {236--246}
 }
 
 @article{dcgnet2026,
@@ -181,17 +178,17 @@ abstract = {We present a labeled large-scale, high resolution chest x-ray datase
 }
 
 @article{GAO2023148,
-title = {An imbalanced binary classification method based on contrastive learning using multi-label confidence comparisons within sample-neighbors pair},
-journal = {Neurocomputing},
-volume = {517},
-pages = {148-164},
-year = {2023},
-issn = {0925-2312},
-doi = {10.1016/j.neucom.2022.10.069},
-url = {https://www.sciencedirect.com/science/article/pii/S0925231222013510},
-author = {Xin Gao and Zhihang Meng and Xin Jia and Jing Liu and Xinping Diao and Bing Xue and Zijian Huang and Kangsheng Li},
-keywords = {Imbalanced binary classification, Contrastive learning, Sample-neighbors pair, Variational auto-encoder, Multi-label confidence comparisons},
-abstract = {For imbalanced classification, data-level methods can achieve inter-class balance, but the samples generated do not contain new information and cannot avoid the problem of introducing noise. Algorithm-level methods may lead to overfitting of the model, and its classification effect is more dependent on the specific dataset and classification task, which means they lack universality. In addition, how to deeply mine the differences in the distribution of data overlap areas, and how to effectively mine the differences between categories when the absolute number of minority samples is small, are also important challenges in imbalanced classification. This paper proposes an imbalanced binary classification method using multi-label confidence comparisons based on contrastive learning. Different from the previous idea of directly learning its distribution characteristics from minority samples, combined with the idea of contrastive learning, the classification task is redefined as the multi-label matching task by mining the deep features that can represent the commonality and difference between the neighboring samples. Multiple differentiated contrastive sample groups are obtained through random sampling in its neighbor sample pool for each sample. This sample is combined with its contrastive sample groups to form multiple sample-neighbor pairs as training samples in the multi-label matching task. The original dataset is multiplied without introducing noise, laying a foundation for the effective mining of class differences when the absolute number of minority class samples is small. Based on the corresponding reconstruction error generated by Variational AutoEncoder (VAE), for sample-neighbor pairs, a multi-label matching loss between target samples and contrastive sample groups that integrates the idea of contrastive learning is designed. a robust classifier is obtained through simultaneous iterative learning of reconstruction error and multi-label matching loss, which can better mine the distribution differences of overlapping regions. In the testing phase, multiple different contrastive sample groups and the corresponding prediction results of the samples to be classified are obtained, which categories can be judged by integrating the predictions of each group for reverse reasoning. Experimental results on 38 public datasets show that the method outperforms typical imbalanced classification methods in both F1-measure and G-mean.}
+  title     = {An imbalanced binary classification method based on contrastive learning using multi-label confidence comparisons within sample-neighbors pair},
+  journal   = {Neurocomputing},
+  volume    = {517},
+  pages     = {148--164},
+  year      = {2023},
+  issn      = {0925-2312},
+  doi       = {10.1016/j.neucom.2022.10.069},
+  url       = {https://www.sciencedirect.com/science/article/pii/S0925231222013510},
+  author    = {Xin Gao and Zhihang Meng and Xin Jia and Jing Liu and Xinping Diao and Bing Xue and Zijian Huang and Kangsheng Li},
+  keywords  = {Imbalanced binary classification, Contrastive learning, Sample-neighbors pair, Variational auto-encoder, Multi-label confidence comparisons},
+  abstract  = {For imbalanced classification, data-level methods can achieve inter-class balance, but the samples generated do not contain new information and cannot avoid the problem of introducing noise. Algorithm-level methods may lead to overfitting of the model, and its classification effect is more dependent on the specific dataset and classification task, which means they lack universality. In addition, how to deeply mine the differences in the distribution of data overlap areas, and how to effectively mine the differences between categories when the absolute number of minority samples is small, are also important challenges in imbalanced classification. This paper proposes an imbalanced binary classification method using multi-label confidence comparisons based on contrastive learning. Different from the previous idea of directly learning its distribution characteristics from minority samples, combined with the idea of contrastive learning, the classification task is redefined as the multi-label matching task by mining the deep features that can represent the commonality and difference between the neighboring samples. Multiple differentiated contrastive sample groups are obtained through random sampling in its neighbor sample pool for each sample. This sample is combined with its contrastive sample groups to form multiple sample-neighbor pairs as training samples in the multi-label matching task. The original dataset is multiplied without introducing noise, laying a foundation for the effective mining of class differences when the absolute number of minority class samples is small. Based on the corresponding reconstruction error generated by Variational AutoEncoder (VAE), for sample-neighbor pairs, a multi-label matching loss between target samples and contrastive sample groups that integrates the idea of contrastive learning is designed. a robust classifier is obtained through simultaneous iterative learning of reconstruction error and multi-label matching loss, which can better mine the distribution differences of overlapping regions. In the testing phase, multiple different contrastive sample groups and the corresponding prediction results of the samples to be classified are obtained, which categories can be judged by integrating the predictions of each group for reverse reasoning. Experimental results on 38 public datasets show that the method outperforms typical imbalanced classification methods in both F1-measure and G-mean.}
 }
 
 @book{geron2022hands,
@@ -204,27 +201,26 @@ abstract = {For imbalanced classification, data-level methods can achieve inter-
   isbn      = {978-1098122478}
 }
 
-
 @article{Gneiting01032007,
-author = {Tilmann Gneiting and Adrian E Raftery},
-title = {Strictly Proper Scoring Rules, Prediction, and Estimation},
-journal = {Journal of the American Statistical Association},
-volume = {102},
-number = {477},
-pages = {359--378},
-year = {2007},
-publisher = {Taylor \& Francis},
-doi = {10.1198/016214506000001437},
-URL = { https://doi.org/10.1198/016214506000001437},
-eprint = {https://doi.org/10.1198/016214506000001437}
+  author    = {Tilmann Gneiting and Adrian E Raftery},
+  title     = {Strictly Proper Scoring Rules, Prediction, and Estimation},
+  journal   = {Journal of the American Statistical Association},
+  volume    = {102},
+  number    = {477},
+  pages     = {359--378},
+  year      = {2007},
+  publisher = {Taylor \& Francis},
+  doi       = {10.1198/016214506000001437},
+  URL       = {https://doi.org/10.1198/016214506000001437},
+  eprint    = {https://doi.org/10.1198/016214506000001437}
 }
 
 @book{Goodfellow-et-al-2016,
-    title={Deep Learning},
-    author={Ian Goodfellow and Yoshua Bengio and Aaron Courville},
-    publisher={MIT Press},
-    note={\url{http://www.deeplearningbook.org}},
-    year={2016}
+  title     = {Deep Learning},
+  author    = {Ian Goodfellow and Yoshua Bengio and Aaron Courville},
+  publisher = {MIT Press},
+  note      = {\url{http://www.deeplearningbook.org}},
+  year      = {2016}
 }
 
 @article{google2024cxrfoundation,
@@ -234,7 +230,6 @@ eprint = {https://doi.org/10.1198/016214506000001437}
   year    = {2024},
   note    = {Available at: Google Cloud Model Garden / Hugging Face}
 }
-
 
 @inproceedings{guo2017calibration,
   author    = {Guo, Chuan and Pleiss, Geoff and Sun, Yu and Weinberger, Kilian Q.},
@@ -249,14 +244,14 @@ eprint = {https://doi.org/10.1198/016214506000001437}
 }
 
 @book{hastie2009elements,
-  title={The Elements of Statistical Learning: Data Mining, Inference, and Prediction},
-  author={Hastie, T. and Tibshirani, R. and Friedman, J.H.},
-  isbn={9780387848846},
-  lccn={2008941148},
-  series={Springer series in statistics},
-  url={https://books.google.ge/books?id=eBSgoAEACAAJ},
-  year={2009},
-  publisher={Springer}
+  title     = {The Elements of Statistical Learning: Data Mining, Inference, and Prediction},
+  author    = {Hastie, T. and Tibshirani, R. and Friedman, J.H.},
+  isbn      = {9780387848846},
+  lccn      = {2008941148},
+  series    = {Springer series in statistics},
+  url       = {https://books.google.ge/books?id=eBSgoAEACAAJ},
+  year      = {2009},
+  publisher = {Springer}
 }
 
 @inproceedings{izmailov2018swa,
@@ -278,16 +273,15 @@ eprint = {https://doi.org/10.1198/016214506000001437}
 }
 
 @book{james2013introduction,
-  title={An Introduction to Statistical Learning: with Applications in R},
-  author={James, G. and Witten, D. and Hastie, T. and Tibshirani, R.},
-  isbn={9781461471387},
-  lccn={13936251},
-  series={Springer Texts in Statistics},
-  url={https://books.google.ge/books?id=qcI_AAAAQBAJ},
-  year={2013},
-  publisher={Springer New York}
+  title     = {An Introduction to Statistical Learning: with Applications in R},
+  author    = {James, G. and Witten, D. and Hastie, T. and Tibshirani, R.},
+  isbn      = {9781461471387},
+  lccn      = {13936251},
+  series    = {Springer Texts in Statistics},
+  url       = {https://books.google.ge/books?id=qcI_AAAAQBAJ},
+  year      = {2013},
+  publisher = {Springer New York}
 }
-
 
 @inproceedings{kingma2015adam,
   author    = {Kingma, Diederik P. and Ba, Jimmy},
@@ -299,13 +293,13 @@ eprint = {https://doi.org/10.1198/016214506000001437}
 }
 
 @book{lee2020deep,
-  title={Deep Learning in Medical Image Analysis: Challenges and Applications},
-  author={Lee, G. and Fujita, H.},
-  isbn={9783030331283},
-  series={Advances in Experimental Medicine and Biology},
-  url={https://books.google.ge/books?id=4A_PDwAAQBAJ},
-  year={2020},
-  publisher={Springer International Publishing}
+  title     = {Deep Learning in Medical Image Analysis: Challenges and Applications},
+  author    = {Lee, G. and Fujita, H.},
+  isbn      = {9783030331283},
+  series    = {Advances in Experimental Medicine and Biology},
+  url       = {https://books.google.ge/books?id=4A_PDwAAQBAJ},
+  year      = {2020},
+  publisher = {Springer International Publishing}
 }
 
 @article{li2024mlip,
@@ -329,18 +323,18 @@ eprint = {https://doi.org/10.1198/016214506000001437}
 }
 
 @book{lu2017deep,
-  title={Deep Learning and Convolutional Neural Networks for Medical Image Computing: Precision Medicine, High Performance and Large-Scale Datasets},
-  author={Lu, L. and Zheng, Y. and Carneiro, G. and Yang, L.},
-  isbn={9783319429991},
-  lccn={2017936345},
-  series={Advances in Computer Vision and Pattern Recognition},
-  url={https://books.google.ge/books?id=M64sDwAAQBAJ},
-  year={2017},
-  publisher={Springer International Publishing}
+  title     = {Deep Learning and Convolutional Neural Networks for Medical Image Computing: Precision Medicine, High Performance and Large-Scale Datasets},
+  author    = {Lu, L. and Zheng, Y. and Carneiro, G. and Yang, L.},
+  isbn      = {9783319429991},
+  lccn      = {2017936345},
+  series    = {Advances in Computer Vision and Pattern Recognition},
+  url       = {https://books.google.ge/books?id=M64sDwAAQBAJ},
+  year      = {2017},
+  publisher = {Springer International Publishing}
 }
 
 @inproceedings{menon2021logit,
-  author    = {Menon, Aditya Krishna and Jayasumana, Sadeep and Rawat, Ankit Singh and Jain, Himanshu and Veit, Andreas and Kumar, Sanjiv},
+  author    = {Menon, Aditya Krishna and Jayasumana, Sadeep and Rawat, Ankit Singh and Jain, Himanshu  and Veit, Andreas and Kumar, Sanjiv},
   title     = {{Long-tail Learning via Logit Adjustment}},
   booktitle = {Proceedings of the International Conference on Learning Representations (ICLR)},
   year      = {2021},
@@ -357,7 +351,6 @@ eprint = {https://doi.org/10.1198/016214506000001437}
   url       = {https://arxiv.org/abs/2504.07416}
 }
 
-
 @book{rabie2023deep,
   editor    = {Rabie, Khaled and Karthik, Chandran and Chowdhury, Subrata and Dutta, Pushan Kumar},
   title     = {{Deep Learning in Medical Image Processing and Analysis}},
@@ -368,6 +361,7 @@ eprint = {https://doi.org/10.1198/016214506000001437}
   url       = {https://doi.org/10.1049/PBHE059E},
   isbn      = {9781839537936}
 }
+
 @article{rubin2009radlex,
   author  = {Rubin, Daniel L. and others},
   title   = {{RadLex: A Multilingual Radiology Lexicon}},
@@ -388,19 +382,18 @@ eprint = {https://doi.org/10.1198/016214506000001437}
 }
 
 @article{10.1371/journal.pmed.1002686,
-    doi = {10.1371/journal.pmed.1002686},
-    author = {Rajpurkar, Pranav AND Irvin, Jeremy AND Ball, Robyn L. AND Zhu, Kaylie AND Yang, Brandon AND Mehta, Hershel AND Duan, Tony AND Ding, Daisy AND Bagul, Aarti AND Langlotz, Curtis P. AND Patel, Bhavik N. AND Yeom, Kristen W. AND Shpanskaya, Katie AND Blankenberg, Francis G. AND Seekins, Jayne AND Amrhein, Timothy J. AND Mong, David A. AND Halabi, Safwan S. AND Zucker, Evan J. AND Ng, Andrew Y. AND Lungren, Matthew P.},
-    journal = {PLOS Medicine},
-    publisher = {Public Library of Science},
-    title = {Deep learning for chest radiograph diagnosis: A retrospective comparison of the CheXNeXt algorithm to practicing radiologists},
-    year = {2018},
-    month = {11},
-    volume = {15},
-    url = {https://doi.org/10.1371/journal.pmed.1002686},
-    pages = {1-17},
-    abstract = {Background Chest radiograph interpretation is critical for the detection of thoracic diseases, including tuberculosis and lung cancer, which affect millions of people worldwide each year. This time-consuming task typically requires expert radiologists to read the images, leading to fatigue-based diagnostic error and lack of diagnostic expertise in areas of the world where radiologists are not available. Recently, deep learning approaches have been able to achieve expert-level performance in medical image interpretation tasks, powered by large network architectures and fueled by the emergence of large labeled datasets. The purpose of this study is to investigate the performance of a deep learning algorithm on the detection of pathologies in chest radiographs compared with practicing radiologists.   Methods and findings We developed CheXNeXt, a convolutional neural network to concurrently detect the presence of 14 different pathologies, including pneumonia, pleural effusion, pulmonary masses, and nodules in frontal-view chest radiographs. CheXNeXt was trained and internally validated on the ChestX-ray8 dataset, with a held-out validation set consisting of 420 images, sampled to contain at least 50 cases of each of the original pathology labels. On this validation set, the majority vote of a panel of 3 board-certified cardiothoracic specialist radiologists served as reference standard. We compared CheXNeXt’s discriminative performance on the validation set to the performance of 9 radiologists using the area under the receiver operating characteristic curve (AUC). The radiologists included 6 board-certified radiologists (average experience 12 years, range 4–28 years) and 3 senior radiology residents, from 3 academic institutions. We found that CheXNeXt achieved radiologist-level performance on 11 pathologies and did not achieve radiologist-level performance on 3 pathologies. The radiologists achieved statistically significantly higher AUC performance on cardiomegaly, emphysema, and hiatal hernia, with AUCs of 0.888 (95% confidence interval [CI] 0.863–0.910), 0.911 (95% CI 0.866–0.947), and 0.985 (95% CI 0.974–0.991), respectively, whereas CheXNeXt’s AUCs were 0.831 (95% CI 0.790–0.870), 0.704 (95% CI 0.567–0.833), and 0.851 (95% CI 0.785–0.909), respectively. CheXNeXt performed better than radiologists in detecting atelectasis, with an AUC of 0.862 (95% CI 0.825–0.895), statistically significantly higher than radiologists' AUC of 0.808 (95% CI 0.777–0.838); there were no statistically significant differences in AUCs for the other 10 pathologies. The average time to interpret the 420 images in the validation set was substantially longer for the radiologists (240 minutes) than for CheXNeXt (1.5 minutes). The main limitations of our study are that neither CheXNeXt nor the radiologists were permitted to use patient history or review prior examinations and that evaluation was limited to a dataset from a single institution.   Conclusions In this study, we developed and validated a deep learning algorithm that classified clinically important abnormalities in chest radiographs at a performance level comparable to practicing radiologists. Once tested prospectively in clinical settings, the algorithm could have the potential to expand patient access to chest radiograph diagnostics.},
-    number = {11},
-
+  doi       = {10.1371/journal.pmed.1002686},
+  author    = {Rajpurkar, Pranav and Irvin, Jeremy and Ball, Robyn L. and Zhu, Kaylie and Yang, Brandon and Mehta, Hershel and Duan, Tony and Ding, Daisy and Bagul, Aarti and Langlotz, Curtis P. and Patel, Bhavik N. and Yeom, Kristen W. and Shpanskaya, Katie and Blankenberg, Francis G. and Seekins, Jayne and Amrhein, Timothy J. and Mong, David A. and Halabi, Safwan S. and Zucker, Evan J. and Ng, Andrew Y. and Lungren, Matthew P.},
+  journal   = {PLOS Medicine},
+  publisher = {Public Library of Science},
+  title     = {Deep learning for chest radiograph diagnosis: A retrospective comparison of the CheXNeXt algorithm to practicing radiologists},
+  year      = {2018},
+  month     = {11},
+  volume    = {15},
+  url       = {https://doi.org/10.1371/journal.pmed.1002686},
+  pages     = {1--17},
+  abstract  = {Background Chest radiograph interpretation is critical for the detection of thoracic diseases, including tuberculosis and lung cancer, which affect millions of people worldwide each year. This time-consuming task typically requires expert radiologists to read the images, leading to fatigue-based diagnostic error and lack of diagnostic expertise in areas of the world where radiologists are not available. Recently, deep learning approaches have been able to achieve expert-level performance in medical image interpretation tasks, powered by large network architectures and fueled by the emergence of large labeled datasets. The purpose of this study is to investigate the performance of a deep learning algorithm on the detection of pathologies in chest radiographs compared with practicing radiologists.   Methods and findings We developed CheXNeXt, a convolutional neural network to concurrently detect the presence of 14 different pathologies, including pneumonia, pleural effusion, pulmonary masses, and nodules in frontal-view chest radiographs. CheXNeXt was trained and internally validated on the ChestX-ray8 dataset, with a held-out validation set consisting of 420 images, sampled to contain at least 50 cases of each of the original pathology labels. On this validation set, the majority vote of a panel of 3 board-certified cardiothoracic specialist radiologists served as reference standard. We compared CheXNeXt’s discriminative performance on the validation set to the performance of 9 radiologists using the area under the receiver operating characteristic curve (AUC). The radiologists included 6 board-certified radiologists (average experience 12 years, range 4–28 years) and 3 senior radiology residents, from 3 academic institutions. We found that CheXNeXt achieved radiologist-level performance on 11 pathologies and did not achieve radiologist-level performance on 3 pathologies. The radiologists achieved statistically significantly higher AUC performance on cardiomegaly, emphysema, and hiatal hernia, with AUCs of 0.888 (95% confidence interval [CI] 0.863–0.910), 0.911 (95% CI 0.866–0.947), and 0.985 (95% CI 0.974–0.991), respectively, whereas CheXNeXt’s AUCs were 0.831 (95% CI 0.790–0.870), 0.704 (95% CI 0.567–0.833), and 0.851 (95% CI 0.785–0.909), respectively. CheXNeXt performed better than radiologists in detecting atelectasis, with an AUC of 0.862 (95% CI 0.825–0.895), statistically significantly higher than radiologists' AUC of 0.808 (95% CI 0.777–0.838); there were no statistically significant differences in AUCs for the other 10 pathologies. The average time to interpret the 420 images in the validation set was substantially longer for the radiologists (240 minutes) than for CheXNeXt (1.5 minutes). The main limitations of our study are that neither CheXNeXt nor the radiologists were permitted to use patient history or review prior examinations and that evaluation was limited to a dataset from a single institution.   Conclusions In this study, we developed and validated a deep learning algorithm that classified clinically important abnormalities in chest radiographs at a performance level comparable to practicing radiologists. Once tested prospectively in clinical settings, the algorithm could have the potential to expand patient access to chest radiograph diagnostics.},
+  number    = {11}
 }
 
 @article{read2011classifier,
