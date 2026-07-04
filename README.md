@@ -1,32 +1,99 @@
 # CXR-Synapse: Graph-Guided Pathology Attention Foundation Model
 
-This repository contains the official implementation of **CXR-Synapse**, a clinical-grade foundation framework for
-multi-label chest X-ray (CXR) classification. The architecture routes localized chest representations using
-pathology-specific RadLex queries, 2D Rotary Position Embeddings (2D RoPE), and structured clinical graph adjacency
-maps.
+[![PyTorch](https://img.shields.io/badge/PyTorch-EE4C2C?style=flat-square&logo=pytorch&logoColor=white)](https://pytorch.org)
+[![TensorFlow](https://img.shields.io/badge/TensorFlow-FF6F00?style=flat-square&logo=tensorflow&logoColor=white)](https://tensorflow.org)
+[![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white)](https://www.docker.com)
+[![CUDA](https://img.shields.io/badge/CUDA-76B900?style=flat-square&logo=nvidia&logoColor=white)](https://developer.nvidia.com/cuda-toolkit)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 
-The pipeline includes a hardware-accelerated forensic dataset auditor to eliminate cross-split data leakage, evaluate
-probability calibration via Asymmetric Isotonic Regression (AIR), and assess risk control boundaries using conformal
-prediction.
+Official implementation of **CXR-Synapse**, a clinical-grade foundation framework for multi-label chest X-ray (CXR) classification. The architecture routes localized chest representations using pathology-specific RadLex queries, 2D Rotary Position Embeddings (2D RoPE), and structured clinical graph adjacency maps.
 
-## System Architecture
+The pipeline features a hardware-accelerated forensic dataset auditor to eliminate cross-split data leakage, evaluates probability calibration via Asymmetric Isotonic Regression (AIR), and assesses risk control boundaries using conformal prediction.
+
+
+## 📌 System Architecture
+![CXR-Synapse System Architecture](CXR-Arch.png)
 ![CXR-Synapse System Architecture](Architecture.png)
 
 
-## Technical Overview
+## 📂 Repository Structure
 
-The execution pipeline consists of a sequential, frozen-backbone paradigm:
+```text
+├── Extraction/
+│   ├── extraction_pipeline.py     # TF-based spatial feature extraction
+│   └── cxr_embeddings/            # Target directory for serialized features
+├── audit.py                       # Parallel bitwise hashing & GPU morphology profiling
+├── analyze_cardinality.py         # Multi-label pathology distribution analysis
+├── train.py                       # CXR-Synapse training script (CB-ASL & SWA)
+├── visualizer.py                  # Clinical diagnostic visualization suite
+├── requirements.txt               # Base dependencies list
+├── LICENSE                        # Project licensing
+└── README.md                      # This documentation file
+```
 
-1. **Feature Extraction (`Extraction/`)**: Isolated extraction of 1376-dimensional spatial features using a dedicated
-   TensorFlow container.
-2. **Forensic Audit (`audit.py`)**: Parallelized bitwise hashing (Blake2b) to systematically isolate and remove
-   cross-split duplicates, followed by GPU-accelerated spatial morphology profiling.
-3. **Cardinality Analysis (`analyze_cardinality.py`)**: Evaluates multi-label pathology distribution across the split
-   boundaries.
-4. **Model Training (`train.py`)**: Optimizes the CXR-Synapse Foundation model under class-balanced asymmetric loss (
-   CB-ASL) and SWA optimization.
-5. **Diagnostic Suite (`visualizer.py`)**: Generates scientific-grade diagnostic plots (Decision Curve Analysis, UMAP
-   manifolds, calibration curves, and attention maps).
+
+## 🛠️ Requirements & System Prerequisites
+
+### Hardware Requirements
+- **GPU**: NVIDIA Tensor Core GPU (Ampere architecture or newer recommended, e.g., RTX 3090/4090, A100, H100)
+- **VRAM**: Minimum 16 GB for training, 24 GB+ recommended for large-batch operations
+- **Storage**: ~50 GB of free space for raw datasets and serialized embeddings
+
+### Software Requirements
+- **Host OS**: Linux (Ubuntu 20.04/22.04 LTS recommended)
+- **NVIDIA Container Toolkit** installed on host
+- **Docker Engine** (v20.10 or newer)
+
+
+## ⚙️ Environment Setup
+
+Due to conflicting dependency requirements for compiling `tensorflow-text` and the PyTorch SWA training suite, the pipeline is split into two isolated Docker container environments.
+
+### Environment A: Base Clinical Model Container (NVIDIA NGC)
+*Used for forensic auditing, model training, and diagnostic visualization.*
+
+Launch the PyTorch container from your host terminal, mapping your project directory to `/workspace`:
+
+```bash
+docker run --gpus all -it --rm \
+  -v "$(pwd):/workspace" \
+  -p 8888:8888 \
+  --ipc=host \
+  --ulimit memlock=-1 \
+  --ulimit stack=67108864 \
+  nvcr.io/nvidia/pytorch:26.03-py3
+```
+
+Once inside the container shell, install the processing, medical image, and visualization dependencies:
+
+```bash
+# Install clinical, scientific, and medical imaging backends
+pip install medmnist torchcp transformers sentencepiece scikit-image \
+            seaborn pandas timm opencv-python-headless umap-learn \
+            statsmodels pypng
+
+# Install CUDA-accelerated auditing backends
+pip install cupy-cuda12x cucim-cu12
+```
+
+### Environment B: Feature Extraction Container (TensorFlow GPU)
+*Used exclusively for running the heavy pre-trained feature extraction pipeline.*
+
+Launch this container in a separate shell:
+
+```bash
+docker run --gpus all -it --rm \
+  -v "$(pwd):/tf/notebooks" \
+  tensorflow/tensorflow:2.20.0-gpu-jupyter \
+  bash -c 'apt-get update && \
+           apt-get install -y libcudnn9-cuda-12 && \
+           ldconfig && \
+           apt-get remove -y libcudnn8 && \
+           pip install medmnist transformers tensorflow-text==2.20.0 opencv-python-headless torch tqdm && \
+           exec bash'
+```
+
+## 📐 Technical Flowcharts
 
 ### System Pipeline & Ingestion Flow
 
@@ -190,50 +257,7 @@ flowchart LR
     style LOGIT fill:#E0F7FA,stroke:#006064,color:#000
 ```
 
-## Environment Setup
-
-Due to differing dependency requirements for tensorflow-text compilation and the PyTorch SWA training suite, the
-pipeline is divided into two container environments.
-
-### Environment A: Base Clinical Model Container (NVIDIA NGC)
-
-Used for forensic auditing, model training, and diagnostic visualization. Run the container from your host terminal,
-mapping your project directory to `/workspace`:
-
-```bash
-docker run --gpus all -it --rm \
-  -v "/path/to/your/cxr_project:/workspace" \
-  -p 8888:8888 \
-  --ipc=host \
-  --ulimit memlock=-1 \
-  --ulimit stack=67108864 \
-  nvcr.io/nvidia/pytorch:26.03-py3
-```
-
-Once inside the container shell, install the processing and visualization dependencies:
-
-```bash
-# Core medical, statistical, and plotting libraries
-pip install medmnist torchcp transformers sentencepiece scikit-image seaborn pandas timm opencv-python-headless umap-learn statsmodels pypng
-
-# CUDA-accelerated auditing backends
-pip install cupy-cuda12x cucim-cu12
-```
-
-### Environment B: Dedicated Feature Extraction Container (TensorFlow GPU)
-
-Used exclusively for running the heavy feature extraction pipeline. Launch this container separately:
-
-```bash
-docker run --gpus all -it --rm \
-  -v "/path/to/your/cxr_project:/tf/notebooks" \
-  tensorflow/tensorflow:2.20.0-gpu-jupyter \
-  bash -c 'apt-get update && apt-get install -y libcudnn9-cuda-12 && ldconfig && apt-get remove -y libcudnn8 && pip install medmnist transformers tensorflow-text==2.20.0 opencv-python-headless torch tqdm && exec bash'
-```
-
-## Execution Pipeline
-
-Follow these steps in sequential order to run the entire project from raw dataset to final diagnostic outputs.
+### Execution State Machine
 
 ```mermaid
 stateDiagram-v2
@@ -334,75 +358,64 @@ stateDiagram-v2
     CRC_CALIB --> INFER: τ, m*, w deployed
 ```
 
-### Step 1: Feature Extraction (Environment B)
+## 🚀 Execution Pipeline
 
-Inside the interactive shell of your **TensorFlow GPU Container**, navigate to the extraction directory and run the
-pipeline to generate your spatial feature representations:
+Follow these execution steps sequentially to run the clinical pipeline from raw dataset ingestion to final diagnostics.
+
+### Step 1: Feature Extraction (Environment B)
+Run the isolated feature extraction pipeline inside your **TensorFlow GPU Container** shell:
 
 ```bash
 cd /tf/notebooks/Extraction
 python extraction_pipeline.py
 ```
+* **Output**: Generates serialized features `train_embeddings.pt`, `val_embeddings.pt`, and `test_embeddings.pt` (1376-dimensional tensors) mapped inside `/workspace/Extraction/cxr_embeddings_10percent`.
 
-*Outputs: Generates `train_embeddings.pt`, `val_embeddings.pt`, and `test_embeddings.pt` containing 1376-dimensional
-embeddings inside `/workspace/Extraction/cxr_embeddings_10percent`.*
 
----
-
-*All subsequent steps are performed inside the **NVIDIA NGC Container** (Environment A) at `/workspace`:*
+> 💡 **Note**: All subsequent processes must be executed inside the **NVIDIA NGC Container** (Environment A) working from `/workspace`:
 
 ```bash
 cd /workspace
 ```
 
-### Step 2: Pre-run Forensic Verification & Audit
-
-Run the database deduplication audit to sweep and clean validation and test splits of any historical train overlap,
-while generating spatial-variance and comorbidity profiles:
+### Step 2: Forensic Verification & Leakage Cleanse
+Execute the parallel hashing and spatial-variance analysis engine to clean validation and test splits:
 
 ```bash
 python audit.py
 ```
+* **Output**: Removes cross-split duplicates and writes automated data quality profiles: `forensic_audit_train.pdf`, `forensic_audit_val.pdf`, and `forensic_audit_test.pdf`.
 
-*Outputs: Generates `forensic_audit_train.pdf`, `forensic_audit_val.pdf`, and `forensic_audit_test.pdf` containing
-empirical comorbidity heatmaps and edge-density profiles.*
-
-### Step 3: Analyze Splitting Cardinalities
-
-Evaluate the joint probability distributions of co-occurring pathologies across your newly cleaned dataset splits:
+### Step 3: Distribution & Cardinality Assessment
+Evaluate multi-label pathology co-occurrence matrices across the cleansed boundaries:
 
 ```bash
 python analyze_cardinality.py
 ```
 
-### Step 4: Train the CXR-Synapse Foundation Network
-
-Begin training the main model using graph-guided cross-attention, class-balanced loss weights (derived via Effective
-Number of Samples), and Stochastic Weight Averaging (SWA):
+### Step 4: Foundation Model Training
+Launch the core optimization loop utilizing class-balanced asymmetric loss (CB-ASL), semantic anchor regularization, and SWA scheduling:
 
 ```bash
 python train.py
 ```
+* **Output**: Tracks real-time validation macro-AUROC. Best-performing weights and final SWA parameters are saved as `CXR_Synapse_Foundation_Seed_[seed].pth`.
 
-*Outputs: Evaluates validation macro-AUROC at each epoch and saves the SWA state dictionary
-to `CXR_Synapse_Foundation_Seed_[seed].pth`.*
-
-### Step 5: Generate Diagnostic & Clinical Suite
-
-Execute the main visualization and conformal evaluation script to output publication-ready figures mapping latent spaces
-and spatial attention maps:
+### Step 5: Clinical Diagnostics & Conformal Visualization Suite
+Deploy the model on unseen test sets, computing calibration, uncertainty metrics, and generating localized heatmaps:
 
 ```bash
 python visualizer.py
 ```
+* **Output**: Generates publication-ready figures (PDF/PNG format) depicting:
+  - Macro-ROC and Precision-Recall Curves
+  - Isotonic Calibration curves
+  - Conformal risk coverage intervals
+  - localized PaQ query-attention maps overlaid on spatial grids
 
-*Outputs: High-resolution PDF/PNG panels depicting Macro-ROC, Isotonic Calibration curves, Conformal coverage
-trade-offs, and localized PaQ attention overlays.*
+## 🎓 Citation & Academic Reference
 
-## Citation & Academic Reference
-
-If you utilize this framework, the associated dataset deduplication protocols, or the CXR-Synapse architecture in your
-research, please cite the work using the academic reference below:
+If you incorporate this clinical architecture, deduplication protocol, or the attention-routing mechanisms in your research, please cite the work as follows:
 
 ```bibtex
 @mastersthesis{cxrsynapse2025,
