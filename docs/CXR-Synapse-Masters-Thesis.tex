@@ -153,7 +153,7 @@
 
     \vfill
     \begin{flushright}
-        {\fontsize{14}{18}\selectfont ხელმძღვანელი: \SupervisorName\\
+        {\fontsize{14}{18}\selectfont სამაგისტრო ნაშრომის ხელმძღვანელი: \SupervisorName\\
         აკადემიური ხარისხი: \SupervisorDegree}
     \end{flushright}
 
@@ -177,9 +177,8 @@
 % -------------------------
 \chapter*{ანოტაცია}
 \addcontentsline{toc}{chapter}{ანოტაცია}
-გულ-მკერდის რენტგენოგრამების (CXR) მრავალნიშნიანი კლასიფიკაცია თანამედროვე სამედიცინო ხელოვნური ინტელექტის ერთ-ერთ უმნიშვნელოვანეს გამოწვევას წარმოადგენს, რაც გამოწვეულია კლასთა უკიდურესი დისბალანსითა და მოდელების ზე-თავდაჯერებულობით. წინამდებარე ნაშრომში წარმოდგენილია კლინიკურად ორიენტირებული არქიტექტურა, რომელიც პირველად აერთიანებს LISA (Language-Invariant Semantic Anchoring) რეგულარიზაციას BioViL-T ენობრივი პრიორებით, PaQ (Pathology-as-Query) სივრცითი ჯვარედინი ყურადღების მექანიზმს ორგანზომილებიანი როტაციული პოზიციური ემბედინგებით (2D RoPE) და ბინომიალურ სუბიექტურ ლოგიკას ეპისტემური გაურკვევლობის ზუსტი რაოდენობრივი დეკუპლირებისთვის.
-
-ჩატარებულმა ექსპერიმენტებმა ChestMNIST მონაცემთა ბაზაზე აჩვენა, რომ შემოთავაზებული მოდელი წარმატებით არღვევს ტრადიციულ რეპრეზენტაციულ ბარიერებს და აღწევს მაკრო-საშუალო AUC 0.7889-ს. პოსტ-ჰოკ კლასობრივი ასიმეტრიული იზოტონური კალიბრაციის (AIR) გამოყენებით, კალიბრაციის საშუალო შეცდომა (Mean ECE) შემცირდა 0.0117-მდე (1.17%). ნაშრომში ინტეგრირებულია გაურკვევლობით მართული კონფორმალური რისკის კონტროლის სისტემა (CRC), რომლითაც მიღწეულია კლასთა საშუალო კონფორმალური დაფარვა 52.0% და პაციენტის დონის დაფარვა 61.7%, ხოლო პროგნოზების საშუალო სიმრავლის ზომა შეადგენს 2.95-ს. შედეგების ვალიდურობა დადასტურებულია 2000-ჯერადი Bootstrap რესემპლინგითა და Blake2b ფორენზიკული დედუპლიკაციით. აღნიშნული არქიტექტურა ქმნის საიმედო საფუძველს სანდო ხელოვნური ინტელექტის (Trustworthy AI) სისტემების მაღალი რისკის მქონე კლინიკურ პრაქტიკაში უსაფრთხო დასანერგად.
+გულ-მკერდის რენტგენოგრამების (CXR) მრავალნიშნიანი კლასიფიკაცია თანამედროვე სამედიცინო ხელოვნური ინტელექტის ერთ-ერთ უმნიშვნელოვანეს გამოწვევას წარმოადგენს, რაც გამოწვეულია კლასთა უკიდურესი დისბალანსითა და მოდელების ზე-თავდაჯერებულობით. წინამდებარე ნაშრომში წარმოდგენილია კლინიკურად ორიენტირებული არქიტექტურა, რომელიც პირველად აერთიანებს LISA (Language-Invariant Semantic Anchoring) რეგულარიზაციას BioViL-T ენობრივი პრიორებით, PaQ (Pathology-as-Query) სივრცითი ჯვარედინი ყურადღების მექანიზმს ორგანზომილებიანი როტაციული პოზიციური ემბედინგებით (2D RoPE) და ბინომიალურ სუბიექტურ ლოგიკას ეპისტემური გაურკვევლობის ზუსტი რაოდენობრივი დეკუპლირებისთვის. ონტოლოგიური ცოდნის ასეთი სინთეზი ხელს უწყობს მოდელის მიერ ანატომიური ნიშნების გააზრებულ ამოცნობას და გამორიცხავს ზედაპირულ ასოციაციებზე სწავლებას (Shortcut Learning).
+ჩატარებულმა ექსპერიმენტებმა ChestMNIST მონაცემთა ბაზაზე აჩვენა, რომ შემოთავაზებული მოდელი წარმატებით არღვევს ტრადიციულ რეპრეზენტაციულ ბარიერებს და აღწევს მაკრო-საშუალო AUC 0.7889-ს. პოსტ-ჰოკ კლასობრივი ასიმეტრიული იზოტონური კალიბრაციის (AIR) გამოყენებით, კალიბრაციის საშუალო შეცდომა (Mean ECE) შემცირდა 0.0117-მდე (1.17%). ნაშრომში ინტეგრირებულია გაურკვევლობით მართული კონფორმალური რისკის კონტროლის სისტემა (CRC), რომლითაც მიღწეულია კლასთა საშუალო კონფორმალური დაფარვა 52.0% და პაციენტის დონის დაფარვა 61.7%, ხოლო პროგნოზების საშუალო სიმრავლის ზომა შეადგენს 2.95-ს. შედეგების ვალიდურობა დადასტურებულია 2000-ჯერადი Bootstrap რესემპლინგითა და Blake2b ფორენზიკული დედუპლიკაციით. აღნიშნული არქიტექტურა ქმნის საიმედო საფუძველს სანდო ხელოვნური ინტელექტის (Trustworthy AI) სისტემების მაღალი რისკის მქონე კლინიკურ პრაქტიკაში უსაფრთხო დასანერგად. ნაშრომში დეტალურად გაწერილი ოპერაციული პროტოკოლები და ეთიკური ჩარჩო განსაზღვრავს სისტემის შემდგომი მულტიცენტრული გარე ვალიდაციისა და რეალურ სამედიცინო გარემოში უსაფრთხო ინტეგრაციის გზებს.
 
 \noindent\textbf{საკვანძო სიტყვები:}
 გულ-მკერდის რენტგენოგრაფია, მრავალნიშნიანი კლასიფიკაცია, Pathology-as-Query, LISA, კალიბრაცია, ევიდენციური ღრმა სწავლება, კონფორმალური უსაფრთხოება, 2D RoPE, სუბიექტური ლოგიკა.
@@ -191,12 +190,19 @@
 \chapter*{Abstract}
 \addcontentsline{toc}{chapter}{Abstract (in English)}
 
-Multi-label classification of Chest X-rays (CXR) remains a major challenge in modern medical artificial intelligence due to extreme class imbalance and model overconfidence. This thesis presents a clinically grounded architecture that integrates LISA (Language-Invariant Semantic Anchoring) regularization with BioViL-T textual priors, a PaQ (Pathology-as-Query) spatial cross-attention mechanism on 2D rotary positional embedding grids (2D RoPE), and Binomial Subjective Logic to quantitatively decouple epistemic and aleatoric uncertainty. 
+\noindent\textbf{Title:} Multi-Label Classification of Chest X-Rays Using LISA and PaQ Algorithms with Conformal Safety Guarantees \\
+\noindent\textbf{Author:} Nika Natsvlishvili \\
+\noindent\textbf{Supervisor:} Davit Datuashvili, PhD in Computer Science \\
 
-Experimental validation on the ChestMNIST benchmark demonstrates that the proposed model achieves a macro-averaged multi-label Area Under the ROC Curve (AUC) of 0.7889. By applying post-hoc class-wise asymmetric isotonic regression (AIR), the Mean Expected Calibration Error (ECE) was reduced to 0.0117 (1.17%). Furthermore, the system incorporates an Uncertainty-Gated Conformal Risk Control (CRC) framework, achieving a class-average conformal coverage of 52.0%, patient-level coverage of 61.7%, and a practical mean prediction set size of 2.95. The statistical validity of these outcomes is verified using 2000-fold bootstrap resampling and Blake2b cryptographic deduplication. This framework establishes a reliable blueprint for deploying Trustworthy AI in clinical pipelines.
+\vspace{1.5em}
 
-\noindent\textbf{Keywords:}
-Chest X-ray, multi-label classification, Pathology-as-Query, LISA, calibration, Evidential Deep Learning, Conformal Prediction, 2D RoPE, Subjective Logic.
+Multi-label classification of Chest X-rays (CXR) remains challenging due to class imbalance and model overconfidence. This thesis presents a clinically grounded architecture integrating LISA (Language-Invariant Semantic Anchoring) regularization with BioViL-T textual priors, a PaQ (Pathology-as-Query) spatial cross-attention mechanism on 2D rotary positional embedding grids (2D RoPE), and Binomial Subjective Logic to decouple epistemic and aleatoric uncertainty. This ontological integration encourages the model to focus on anatomical features, mitigating shortcut learning from visual artifacts.
+
+Validation on ChestMNIST demonstrates a macro-averaged multi-label AUC of 0.7889. Post-hoc class-wise asymmetric isotonic regression (AIR) reduced the Mean Expected Calibration Error (ECE) to 0.0117 (1.17\%). Incorporating an Uncertainty-Gated Conformal Risk Control (CRC) framework yields a class-average conformal coverage of 52.0\%, patient-level coverage of 61.7\%, and a mean prediction set size of 2.95. Results are validated using 2000-fold bootstrap resampling and Blake2b cryptographic deduplication, establishing a blueprint for Trustworthy AI. Finally, our detailed operational and ethical protocols define pathways for subsequent multi-centric external validation and safe clinical integration.
+
+\vspace{1.5em}
+
+\noindent\textbf{Keywords:} Chest X-ray, multi-label classification, Pathology-as-Query, LISA, calibration, Evidential Deep Learning, Conformal Prediction, 2D RoPE, Subjective Logic.
 \end{english}
 
 % -------------------------
